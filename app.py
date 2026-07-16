@@ -266,12 +266,14 @@ def _opcoes_para_api(raw=None):
 
 
 def carregar_formulario_config():
-    """Campos fixos + opções editáveis, preferindo o Supabase quando disponível."""
+    """Campos fixos + opções editáveis, priorizando o arquivo local de configuração."""
+    opcoes = _opcoes_para_api(carregar_opcoes_arquivo())
+    campos = DEFAULT_CAMPOS
+    fonte = "arquivo"
+
     if supabase is not None:
         try:
             campos_res = supabase.table("form_campos").select("*").order("ordem").execute()
-            opcoes_res = supabase.table("form_opcoes").select("*").order("ordem").execute()
-
             campos = []
             for row in campos_res.data or []:
                 campos.append({
@@ -284,35 +286,15 @@ def carregar_formulario_config():
                     "ativo": row.get("ativo", True),
                     "lista_grupo": row.get("lista_grupo"),
                 })
-
-            opcoes = {}
-            for row in opcoes_res.data or []:
-                grupo = row.get("grupo") or ""
-                if not grupo:
-                    continue
-                opcoes.setdefault(grupo, []).append({
-                    "id": row.get("id"),
-                    "valor": row.get("valor"),
-                    "label": row.get("label") or row.get("valor"),
-                    "ordem": row.get("ordem", 0),
-                    "ativo": row.get("ativo", True),
-                })
-
-            if not campos:
-                campos = DEFAULT_CAMPOS
-            if not opcoes:
-                opcoes = _opcoes_para_api()
-            else:
-                opcoes = {g: sorted(v, key=lambda item: (item.get("ordem") or 0, str(item.get("valor") or ""))) for g, v in opcoes.items()}
-                opcoes = _opcoes_para_api({g: [item.get("valor") for item in v] for g, v in opcoes.items()})
-            return {"campos": campos, "opcoes": opcoes, "fonte": "supabase"}
+            if campos:
+                fonte = "supabase-campos"
         except Exception:
-            pass
+            campos = DEFAULT_CAMPOS
 
     return {
-        "campos": DEFAULT_CAMPOS,
-        "opcoes": _opcoes_para_api(),
-        "fonte": "arquivo",
+        "campos": campos,
+        "opcoes": opcoes,
+        "fonte": fonte,
     }
 
 
@@ -338,29 +320,16 @@ def admin_login():
     if session.get("user_id"):
         return redirect(url_for("admin_home"))
 
-    precisa_cadastro = auth_db.count_usuarios() == 0
     erro = None
 
     if request.method == "POST":
-        if precisa_cadastro:
-            # Primeiro usuário: cria conta admin
-            try:
-                uid = auth_db.criar_usuario(
-                    request.form.get("usuario"),
-                    request.form.get("senha"),
-                    request.form.get("nome"),
-                )
-                user = auth_db.autenticar(request.form.get("usuario"), request.form.get("senha"))
-                session["user_id"] = user["id"]
-                session["user_login"] = user["usuario"]
-                session["user_nome"] = user["nome"]
-                auditar("cadastro", "usuario", uid, {"primeiro_admin": True})
-                return redirect(url_for("admin_home"))
-            except ValueError as e:
-                erro = str(e)
-                precisa_cadastro = True
+        usuario = (request.form.get("usuario") or "").strip()
+        senha = (request.form.get("senha") or "").strip()
+
+        if not usuario or not senha:
+            erro = "Informe usuário e senha."
         else:
-            user = auth_db.autenticar(request.form.get("usuario"), request.form.get("senha"))
+            user = auth_db.autenticar(usuario, senha)
             if user:
                 session["user_id"] = user["id"]
                 session["user_login"] = user["usuario"]
@@ -373,7 +342,7 @@ def admin_login():
     return render_template(
         "admin/login.html",
         erro=erro,
-        precisa_cadastro=precisa_cadastro,
+        precisa_cadastro=False,
     )
 
 
