@@ -1,0 +1,36 @@
+{
+  "setor_solicitante": [
+    "QUALIDADE",
+    "SEGURANÇA",
+    "TRANSPORTE",
+    "PLANEJAMENTO",
+    "ALMOXERIFADO",
+    "MEIO AMBIENTE",
+    "SAUDE",
+    "PRODUÇÃO"
+  ],
+  "equipamento": [
+    "Basculante",
+    "Retroescavadeira",
+    "Veiculo Passageiro"
+  ],
+  "as_code": [
+    "AS_005 - EQUIPE ADMINISTRATIVA",
+    "AS_006 - APOIO A PRODUÇÃO",
+    "AS_015-BRITAGEM SECUNDARIA",
+    "AS_017-TR-2012KS-11/TR-2036KS-23",
+    "AS_018-CT-2020KS-04",
+    "AS_020 - SERVIÇOS EXTRAORDINARIOS",
+    "AS_021-TR-2091KS-01/02/03",
+    "AS_022-ARMAÇÃO - CORTE E DOBRA",
+    "AS_023-ED-2012KS-01",
+    "AS_024-APOIO OPERACIONAL",
+    "AS_025-TR-2011KS-15",
+    "Outros"
+  ],
+  "turno": [
+    "Dia",
+    "Noite",
+    "Extensão de Horário"
+  ]
+}

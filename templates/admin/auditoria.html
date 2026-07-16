@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auditoria - Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container wide">
+    <header>
+        <h1>Auditoria</h1>
+        <div class="header-actions-inline">
+            <span class="user-chip">{{ user.nome }}</span>
+            <a href="{{ url_for('admin_home') }}" class="btn-nav">Menu</a>
+            <a href="{{ url_for('admin_logout') }}" class="btn-nav">Sair</a>
+        </div>
+    </header>
+
+    <nav class="page-nav">
+        <a href="{{ url_for('admin_solicitacoes') }}" class="page-nav-link">Solicitações</a>
+        <a href="{{ url_for('admin_efetivo') }}" class="page-nav-link">Efetivo</a>
+        <a href="{{ url_for('admin_config') }}" class="page-nav-link">Configuração</a>
+        <a href="{{ url_for('admin_usuarios') }}" class="page-nav-link">Usuários</a>
+        <a href="{{ url_for('admin_auditoria') }}" class="page-nav-link active">Auditoria</a>
+    </nav>
+
+    <p class="hint">Histórico de login, remoções e alterações feitas pelos usuários administrativos.</p>
+
+    <div class="search-box" style="margin-bottom:14px;">
+        <input type="search" id="busca-audit" placeholder="Filtrar por usuário, ação ou solicitação...">
+    </div>
+
+    <table class="data-table" id="tabela-audit">
+        <thead>
+            <tr>
+                <th>Quando</th>
+                <th>Usuário</th>
+                <th>Ação</th>
+                <th>Entidade</th>
+                <th>ID</th>
+                <th>Detalhes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.criado_em }}</td>
+                <td>{{ log.usuario_nome }}</td>
+                <td>{{ log.acao }}</td>
+                <td>{{ log.entidade }}</td>
+                <td>{{ log.entidade_id or '—' }}</td>
+                <td class="td-detalhe"><code>{{ log.detalhes or '' }}</code></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">Nenhum registro ainda.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<script>
+document.getElementById('busca-audit').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('#tabela-audit tbody tr').forEach(tr => {
+        tr.style.display = !q || tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+});
+</script>
+</body>
+</html>

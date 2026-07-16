@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enviar Solicitação</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container form-page">
+    <header>
+        <div>
+            <h1>Enviar solicitação</h1>
+            <p class="page-lead">Preencha os dados abaixo para solicitar hora extra / efetivo</p>
+        </div>
+        <a href="{{ url_for('index') }}" class="btn-nav">Início</a>
+    </header>
+
+    <form id="solicitacao-form" novalidate>
+        <section class="form-card" id="card-dados">
+            <div class="form-card-header">
+                <div>
+                    <h2>Dados da solicitação</h2>
+                    <p>Informações básicas do pedido</p>
+                </div>
+            </div>
+            <div class="form-card-body" id="campos-dinamicos"></div>
+        </section>
+
+        <section class="form-card" id="secao-funcoes">
+            <div class="form-card-header">
+                <div>
+                    <h2>Funções e colaboradores</h2>
+                    <p>Selecione funções e marque os colaboradores necessários</p>
+                </div>
+            </div>
+            <div class="form-card-body">
+                <div class="search-box search-box-inline">
+                    <input type="search" id="busca-colab-global" placeholder="Filtrar colaboradores por matrícula ou nome...">
+                </div>
+                <div id="blocos-container" class="blocos-lista"></div>
+                <button type="button" id="add-funcao" class="btn-add">+ Adicionar outra função</button>
+            </div>
+        </section>
+
+        <section class="form-card" id="secao-equipamentos">
+            <div class="form-card-header">
+                <div>
+                    <h2>Equipamentos</h2>
+                    <p>Vincule equipamentos e o operador responsável (opcional)</p>
+                </div>
+            </div>
+            <div class="form-card-body">
+                <div id="equipamentos-container" class="blocos-lista"></div>
+                <button type="button" id="add-equipamento" class="btn-add">+ Adicionar equipamento</button>
+            </div>
+        </section>
+
+        <section class="form-card form-card-resumo" id="card-resumo-previa">
+            <div class="form-card-header">
+                <div>
+                    <h2>Resumo antes do envio</h2>
+                    <p>Confira os dados. O texto final será gerado após o envio.</p>
+                </div>
+            </div>
+            <div class="form-card-body">
+                <div id="resumo-previa" class="resumo-previa">Preencha o formulário para ver o resumo.</div>
+            </div>
+        </section>
+
+        <div class="form-actions">
+            <p id="form-erro" class="form-erro" hidden></p>
+            <button type="submit" class="btn-primary btn-enviar" id="btn-enviar">Enviar Solicitação</button>
+        </div>
+    </form>
+</div>
+
+<template id="bloco-template">
+    <div class="bloco-item bloco-funcao">
+        <div class="bloco-item-top">
+            <span class="bloco-item-badge">Função</span>
+            <button type="button" class="btn-remover-bloco" title="Remover">×</button>
+        </div>
+        <div class="bloco-grid">
+            <div class="form-group">
+                <label>Função</label>
+                <select class="funcao-select" required>
+                    <option value="">Selecione</option>
+                </select>
+            </div>
+            <div class="form-group form-group-qtd">
+                <label>Quantidade</label>
+                <input type="number" class="quantidade-input" readonly value="0">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Colaboradores</label>
+            <div class="colaboradores-container"></div>
+        </div>
+    </div>
+</template>
+
+<template id="equipamento-template">
+    <div class="bloco-item bloco-equipamento">
+        <div class="bloco-item-top">
+            <span class="bloco-item-badge badge-equip">Equipamento</span>
+            <button type="button" class="btn-remover-bloco" title="Remover">×</button>
+        </div>
+        <div class="bloco-grid">
+            <div class="form-group">
+                <label>Equipamento</label>
+                <select class="equipamento-select">
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Operador</label>
+                <div class="combobox" data-role="operador">
+                    <input type="search" class="operador-busca" placeholder="Buscar por matrícula ou nome..." autocomplete="off">
+                    <input type="hidden" class="operador-valor">
+                    <div class="combobox-lista" hidden></div>
+                    <div class="combobox-selecionado" hidden></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

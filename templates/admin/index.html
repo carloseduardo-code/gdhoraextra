@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Hora Extra</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container home-container">
+    <header class="home-header">
+        <div>
+            <h1>Administração</h1>
+            <p class="home-subtitle">Olá, {{ user.nome }}</p>
+        </div>
+        <a href="{{ url_for('admin_logout') }}" class="btn-nav">Sair</a>
+    </header>
+
+    <nav class="menu-grid" aria-label="Menu administrativo">
+        <a href="{{ url_for('admin_solicitacoes') }}" class="menu-card">
+            <span class="menu-card-title">Solicitações</span>
+            <span class="menu-card-desc">Ver, exportar e apagar solicitações</span>
+        </a>
+        <a href="{{ url_for('admin_efetivo') }}" class="menu-card">
+            <span class="menu-card-title">Efetivo</span>
+            <span class="menu-card-desc">Consultar e importar planilha de colaboradores</span>
+        </a>
+        <a href="{{ url_for('admin_config') }}" class="menu-card">
+            <span class="menu-card-title">Configuração</span>
+            <span class="menu-card-desc">Equipamentos, setores e áreas de serviço (AS)</span>
+        </a>
+        <a href="{{ url_for('admin_usuarios') }}" class="menu-card">
+            <span class="menu-card-title">Usuários</span>
+            <span class="menu-card-desc">Cadastrar quem pode acessar a área admin</span>
+        </a>
+        <a href="{{ url_for('admin_auditoria') }}" class="menu-card">
+            <span class="menu-card-title">Auditoria</span>
+            <span class="menu-card-desc">Ver quem removeu ou alterou registros</span>
+        </a>
+    </nav>
+
+    <p class="home-admin-link">
+        <a href="{{ url_for('index') }}">Área pública</a>
+    </p>
+</div>
+</body>
+</html>

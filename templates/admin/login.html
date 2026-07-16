@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if precisa_cadastro %}Primeiro acesso{% else %}Login Admin{% endif %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container home-container">
+    <header class="home-header">
+        <h1>Área administrativa</h1>
+        {% if precisa_cadastro %}
+        <p class="home-subtitle">Crie o primeiro usuário administrador</p>
+        {% else %}
+        <p class="home-subtitle">Entre com seu usuário e senha</p>
+        {% endif %}
+    </header>
+
+    {% if erro %}
+    <p class="erro-box">{{ erro }}</p>
+    {% endif %}
+
+    <form method="post" class="login-form">
+        {% if precisa_cadastro %}
+        <div class="form-group">
+            <label for="nome">Nome</label>
+            <input type="text" id="nome" name="nome" required autofocus placeholder="Seu nome">
+        </div>
+        {% endif %}
+        <div class="form-group">
+            <label for="usuario">Usuário</label>
+            <input type="text" id="usuario" name="usuario" required {% if not precisa_cadastro %}autofocus{% endif %} autocomplete="username">
+        </div>
+        <div class="form-group">
+            <label for="senha">Senha</label>
+            <input type="password" id="senha" name="senha" required autocomplete="{% if precisa_cadastro %}new-password{% else %}current-password{% endif %}">
+        </div>
+        <button type="submit" class="btn-primary">
+            {% if precisa_cadastro %}Criar conta e entrar{% else %}Entrar{% endif %}
+        </button>
+    </form>
+
+    <p class="home-admin-link">
+        <a href="{{ url_for('index') }}">← Voltar à área pública</a>
+    </p>
+</div>
+</body>
+</html>

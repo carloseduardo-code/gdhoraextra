@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitações - Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container wide">
+    <header>
+        <h1>Solicitações</h1>
+        <div class="header-actions-inline">
+            <span class="user-chip">{{ user.nome }}</span>
+            <a href="{{ url_for('admin_home') }}" class="btn-nav">Menu</a>
+            <a href="{{ url_for('admin_logout') }}" class="btn-nav">Sair</a>
+        </div>
+    </header>
+
+    <nav class="page-nav">
+        <a href="{{ url_for('admin_solicitacoes') }}" class="page-nav-link active">Solicitações</a>
+        <a href="{{ url_for('admin_efetivo') }}" class="page-nav-link">Efetivo</a>
+        <a href="{{ url_for('admin_config') }}" class="page-nav-link">Configuração</a>
+        <a href="{{ url_for('admin_usuarios') }}" class="page-nav-link">Usuários</a>
+        <a href="{{ url_for('admin_auditoria') }}" class="page-nav-link">Auditoria</a>
+    </nav>
+
+    <div class="toolbar">
+        <div class="search-box">
+            <input type="search" id="busca" placeholder="Pesquisar por solicitante, setor, equipamento, função...">
+        </div>
+        <button type="button" class="btn-export" id="btn-exportar">Exportar Excel</button>
+    </div>
+
+    <div id="lista-solicitacoes">
+        <p>Carregando...</p>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='admin_solicitacoes.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuários - Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container wide">
+    <header>
+        <h1>Usuários</h1>
+        <div class="header-actions-inline">
+            <span class="user-chip">{{ user.nome }}</span>
+            <a href="{{ url_for('admin_home') }}" class="btn-nav">Menu</a>
+            <a href="{{ url_for('admin_logout') }}" class="btn-nav">Sair</a>
+        </div>
+    </header>
+
+    <nav class="page-nav">
+        <a href="{{ url_for('admin_solicitacoes') }}" class="page-nav-link">Solicitações</a>
+        <a href="{{ url_for('admin_efetivo') }}" class="page-nav-link">Efetivo</a>
+        <a href="{{ url_for('admin_config') }}" class="page-nav-link">Configuração</a>
+        <a href="{{ url_for('admin_usuarios') }}" class="page-nav-link active">Usuários</a>
+        <a href="{{ url_for('admin_auditoria') }}" class="page-nav-link">Auditoria</a>
+    </nav>
+
+    {% if erro %}<p class="erro-box">{{ erro }}</p>{% endif %}
+    {% if ok %}<p class="status-msg sucesso">{{ ok }}</p>{% endif %}
+
+    <section class="config-section">
+        <h2>Cadastrar novo usuário</h2>
+        <form method="post" class="inline-form">
+            <input name="nome" placeholder="Nome" required>
+            <input name="usuario" placeholder="Usuário" required>
+            <input name="senha" type="password" placeholder="Senha" required>
+            <button type="submit" class="btn-secondary">Cadastrar</button>
+        </form>
+    </section>
+
+    <section class="config-section">
+        <h2>Usuários cadastrados</h2>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Usuário</th>
+                    <th>Desde</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in usuarios %}
+                <tr>
+                    <td>{{ u.nome }}</td>
+                    <td>{{ u.usuario }}</td>
+                    <td>{{ u.criado_em }}</td>
+                    <td>{% if u.ativo %}Ativo{% else %}Inativo{% endif %}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4">Nenhum usuário.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</div>
+</body>
+</html>

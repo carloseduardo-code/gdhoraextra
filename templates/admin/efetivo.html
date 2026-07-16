@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Efetivo - Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container wide">
+    <header>
+        <h1>Efetivo</h1>
+        <div class="header-actions-inline">
+            <span class="user-chip">{{ user.nome }}</span>
+            <a href="{{ url_for('admin_home') }}" class="btn-nav">Menu</a>
+            <a href="{{ url_for('admin_logout') }}" class="btn-nav">Sair</a>
+        </div>
+    </header>
+
+    <nav class="page-nav">
+        <a href="{{ url_for('admin_solicitacoes') }}" class="page-nav-link">Solicitações</a>
+        <a href="{{ url_for('admin_efetivo') }}" class="page-nav-link active">Efetivo</a>
+        <a href="{{ url_for('admin_config') }}" class="page-nav-link">Configuração</a>
+        <a href="{{ url_for('admin_usuarios') }}" class="page-nav-link">Usuários</a>
+        <a href="{{ url_for('admin_auditoria') }}" class="page-nav-link">Auditoria</a>
+    </nav>
+
+    <div class="toolbar">
+        <div class="search-box">
+            <input type="search" id="busca" placeholder="Pesquisar por matrícula ou nome...">
+        </div>
+        <span id="total-registros">Total: 0</span>
+    </div>
+
+    <div class="import-bar">
+        <form id="form-importar">
+            <input type="file" id="arquivo-input" accept=".xls,.xlsx,.csv">
+            <button type="submit" class="btn-import" id="btn-importar">Importar Planilha</button>
+        </form>
+        <span id="status-import"></span>
+    </div>
+    <p class="hint">Ao importar, o efetivo anterior é removido e substituído pela nova planilha.</p>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Matrícula</th>
+                <th>Nome</th>
+                <th>Função</th>
+            </tr>
+        </thead>
+        <tbody id="efetivo-body">
+            <tr><td colspan="3">Carregando...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script src="{{ url_for('static', filename='efetivo.js') }}"></script>
+</body>
+</html>

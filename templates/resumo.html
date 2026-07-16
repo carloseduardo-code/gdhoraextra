@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumo da Solicitação</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Solicitação enviada</h1>
+        <a href="{{ url_for('index') }}" class="btn-nav">Início</a>
+    </header>
+
+    <p class="home-subtitle">Copie o texto abaixo e envie no WhatsApp, e-mail ou outro canal.</p>
+
+    <pre id="resumo-texto" class="resumo-box">Carregando...</pre>
+
+    <div class="acoes-resumo">
+        <button type="button" class="btn-primary" id="btn-copiar">Copiar Solicitação</button>
+        <a href="{{ url_for('solicitacao') }}" class="btn-secondary" style="text-align:center; text-decoration:none; display:block; margin-top:10px;">Nova solicitação</a>
+    </div>
+    <p id="copiar-status" class="status-inline"></p>
+</div>
+
+<script>
+const SOL_ID = {{ solicitacao_id }};
+
+async function carregar() {
+    const pre = document.getElementById('resumo-texto');
+    try {
+        const res = await fetch('/api/solicitacoes/' + SOL_ID);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro');
+        pre.textContent = data.resumo_texto || '(sem resumo)';
+    } catch (e) {
+        pre.textContent = 'Erro ao carregar resumo.';
+    }
+}
+
+document.getElementById('btn-copiar').addEventListener('click', async () => {
+    const texto = document.getElementById('resumo-texto').textContent;
+    const status = document.getElementById('copiar-status');
+    try {
+        await navigator.clipboard.writeText(texto);
+        status.textContent = 'Copiado!';
+    } catch {
+        const range = document.createRange();
+        range.selectNodeContents(document.getElementById('resumo-texto'));
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        document.execCommand('copy');
+        status.textContent = 'Copiado!';
+    }
+});
+
+carregar();
+</script>
+</body>
+</html>

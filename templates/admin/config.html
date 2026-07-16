@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuração - Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container wide">
+    <header>
+        <h1>Configuração</h1>
+        <div class="header-actions-inline">
+            <span class="user-chip">{{ user.nome }}</span>
+            <a href="{{ url_for('admin_home') }}" class="btn-nav">Menu</a>
+            <a href="{{ url_for('admin_logout') }}" class="btn-nav">Sair</a>
+        </div>
+    </header>
+
+    <nav class="page-nav">
+        <a href="{{ url_for('admin_solicitacoes') }}" class="page-nav-link">Solicitações</a>
+        <a href="{{ url_for('admin_efetivo') }}" class="page-nav-link">Efetivo</a>
+        <a href="{{ url_for('admin_config') }}" class="page-nav-link active">Configuração</a>
+        <a href="{{ url_for('admin_usuarios') }}" class="page-nav-link">Usuários</a>
+        <a href="{{ url_for('admin_auditoria') }}" class="page-nav-link">Auditoria</a>
+    </nav>
+
+    <p class="hint">Gerencie as opções que aparecem no formulário de solicitação. Alterações refletem imediatamente.</p>
+
+    <div class="config-tabs" id="config-tabs">
+        <button type="button" class="config-tab active" data-grupo="equipamento">Equipamento</button>
+        <button type="button" class="config-tab" data-grupo="setor_solicitante">Setor</button>
+        <button type="button" class="config-tab" data-grupo="as_code">AS</button>
+    </div>
+
+    <section class="config-section">
+        <h2 id="titulo-grupo">Equipamento</h2>
+        <div id="lista-opcoes">Carregando...</div>
+
+        <form id="form-nova-opcao" class="inline-form">
+            <input name="valor" placeholder="Nova opção..." required>
+            <button type="submit" class="btn-secondary">Adicionar</button>
+        </form>
+        <p id="config-status" class="status-inline" hidden></p>
+    </section>
+</div>
+
+<script src="{{ url_for('static', filename='config.js') }}"></script>
+</body>
+</html>

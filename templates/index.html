@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hora Extra</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container home-container">
+    <header class="home-header">
+        <h1>Hora Extra</h1>
+        <p class="home-subtitle">Área pública — solicitações de efetivo</p>
+    </header>
+
+    <nav class="menu-grid" aria-label="Menu público">
+        <a href="{{ url_for('solicitacao') }}" class="menu-card">
+            <span class="menu-card-title">Enviar Solicitação</span>
+            <span class="menu-card-desc">Preencher e enviar pedido de hora extra / efetivo</span>
+        </a>
+    </nav>
+
+    <p class="home-admin-link">
+        <a href="{{ url_for('admin_login') }}">Acesso administrativo</a>
+    </p>
+</div>
+</body>
+</html>
