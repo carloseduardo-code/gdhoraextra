@@ -95,7 +95,7 @@ function setupSearchSelect(selectEl) {
     input.type = 'text';
     input.className = 'searchable-input';
     input.autocomplete = 'off';
-    input.placeholder = 'Filtrar opções...';
+    input.placeholder = '';
     input.setAttribute('aria-label', 'Filtrar opções');
 
     const listBox = document.createElement('div');
@@ -206,7 +206,7 @@ function renderCampos() {
             select.id = `campo-${campo.chave}`;
             select.name = campo.chave;
             select.required = !!campo.obrigatorio;
-            select.innerHTML = '<option value="">Selecione...</option>';
+            select.innerHTML = '<option value=""></option>';
             const opts = formConfig.opcoes[campo.lista_grupo || campo.chave] || [];
             opts.forEach(o => {
                 const opt = document.createElement('option');
@@ -346,7 +346,7 @@ function setupCombobox(wrap, listaFonte, onSelect, onClear) {
 
 /* ---------- Funções (lógica preservada) ---------- */
 function popularSelect(selectEl) {
-    selectEl.innerHTML = '<option value="">Selecione</option>';
+    selectEl.innerHTML = '<option value=""></option>';
     funcoes.forEach(f => {
         const opt = document.createElement('option');
         opt.value = f;
