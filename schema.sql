@@ -18,6 +18,7 @@ create table if not exists public.solicitacoes (
   as_code text,
   data_solicitacao date not null,
   turno text,
+  observacao text,
   resumo_texto text,
   resumo_admin text,
   criado_em timestamptz not null default now()
@@ -26,6 +27,7 @@ create table if not exists public.solicitacoes (
 alter table public.solicitacoes add column if not exists solicitante text;
 alter table public.solicitacoes add column if not exists setor_solicitante text;
 alter table public.solicitacoes add column if not exists equipamento text;
+alter table public.solicitacoes add column if not exists observacao text;
 alter table public.solicitacoes add column if not exists resumo_texto text;
 alter table public.solicitacoes add column if not exists resumo_admin text;
 
