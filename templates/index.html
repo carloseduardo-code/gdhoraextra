@@ -8,10 +8,16 @@
 </head>
 <body>
 <div class="container home-container">
-    <header class="home-header">
-        <h1>Hora Extra</h1>
-        <p class="home-subtitle">Área pública — solicitações de efetivo</p>
-    </header>
+    <div class="page-header">
+        <div class="logo-brand">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Gonçalves & Dias">
+            <div>
+                <h1>Hora Extra</h1>
+                <p class="home-subtitle">Área pública — solicitações de efetivo</p>
+            </div>
+        </div>
+        <a href="{{ url_for('admin_login') }}" class="btn-nav">Acesso administrativo</a>
+    </div>
 
     <nav class="menu-grid" aria-label="Menu público">
         <a href="{{ url_for('solicitacao') }}" class="menu-card">

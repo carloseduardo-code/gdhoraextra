@@ -95,7 +95,7 @@ function setupSearchSelect(selectEl) {
     input.type = 'text';
     input.className = 'searchable-input';
     input.autocomplete = 'off';
-    input.placeholder = 'Filtrar opções...';
+    input.placeholder = '';
     input.setAttribute('aria-label', 'Filtrar opções');
 
     const listBox = document.createElement('div');
@@ -206,7 +206,7 @@ function renderCampos() {
             select.id = `campo-${campo.chave}`;
             select.name = campo.chave;
             select.required = !!campo.obrigatorio;
-            select.innerHTML = '<option value="">Selecione...</option>';
+            select.innerHTML = '<option value=""></option>';
             const opts = formConfig.opcoes[campo.lista_grupo || campo.chave] || [];
             opts.forEach(o => {
                 const opt = document.createElement('option');
@@ -346,7 +346,7 @@ function setupCombobox(wrap, listaFonte, onSelect, onClear) {
 
 /* ---------- Funções (lógica preservada) ---------- */
 function popularSelect(selectEl) {
-    selectEl.innerHTML = '<option value="">Selecione</option>';
+    selectEl.innerHTML = '<option value="">Selecione função</option>';
     funcoes.forEach(f => {
         const opt = document.createElement('option');
         opt.value = f;
@@ -444,7 +444,7 @@ function atualizarQuantidade(container, qtdInput) {
 
 /* ---------- Equipamentos ---------- */
 function popularSelectEquipamento(selectEl) {
-    selectEl.innerHTML = '<option value="">Selecione...</option>';
+    selectEl.innerHTML = '<option value="">Selecione equipamento</option>';
     const opts = formConfig.opcoes.equipamento || [];
     opts.forEach(o => {
         const opt = document.createElement('option');
@@ -525,6 +525,7 @@ function coletarCamposForm() {
         payload.as_code = outros;
         payload.as_code_outros = outros;
     }
+    payload.observacao = document.getElementById('campo-observacao')?.value || '';
     return payload;
 }
 
@@ -643,6 +644,11 @@ function atualizarResumoPrevia() {
             const op = eq.operador ? `${eq.operador.matricula} - ${eq.operador.nome}` : '—';
             linhas.push(`<div>• <strong>${escapar(eq.equipamento)}</strong> → ${escapar(op)}</div>`);
         });
+    }
+
+    if (campos.observacao) {
+        linhas.push('<hr><strong>Observação</strong>');
+        linhas.push(`<div>${escapar(campos.observacao)}</div>`);
     }
 
     box.innerHTML = linhas.length

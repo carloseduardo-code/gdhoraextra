@@ -8,12 +8,16 @@
 </head>
 <body>
 <div class="container">
-    <header>
-        <h1>Solicitação enviada</h1>
+    <div class="page-header">
+        <div class="logo-brand">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Gonçalves & Dias">
+            <div>
+                <h1>Solicitação enviada</h1>
+                <p class="home-subtitle">Copie o texto abaixo e compartilhe com sua equipe.</p>
+            </div>
+        </div>
         <a href="{{ url_for('index') }}" class="btn-nav">Início</a>
-    </header>
-
-    <p class="home-subtitle">Copie o texto abaixo e envie no WhatsApp, e-mail ou outro canal.</p>
+    </div>
 
     <pre id="resumo-texto" class="resumo-box">Carregando...</pre>
 

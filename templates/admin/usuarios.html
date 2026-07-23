@@ -30,6 +30,7 @@
 
     <section class="config-section">
         <h2>Cadastrar novo usuário</h2>
+        <p class="home-subtitle">Novos usuários ficarão pendentes até aprovação do mestre Kadu.</p>
         <form method="post" class="inline-form">
             <input name="nome" placeholder="Nome" required>
             <input name="usuario" placeholder="Usuário" required>
@@ -47,6 +48,7 @@
                     <th>Usuário</th>
                     <th>Desde</th>
                     <th>Status</th>
+                    <th>Ação</th>
                 </tr>
             </thead>
             <tbody>
@@ -55,10 +57,19 @@
                     <td>{{ u.nome }}</td>
                     <td>{{ u.usuario }}</td>
                     <td>{{ u.criado_em }}</td>
-                    <td>{% if u.ativo %}Ativo{% else %}Inativo{% endif %}</td>
+                    <td>{% if u.ativo %}Ativo{% else %}Pendente{% endif %}</td>
+                    <td>
+                        {% if not u.ativo and is_master %}
+                        <form method="post" style="display:inline;">
+                            <input type="hidden" name="action" value="aprovar">
+                            <input type="hidden" name="usuario_id" value="{{ u.id }}">
+                            <button type="submit" class="btn-secondary">Aprovar</button>
+                        </form>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="4">Nenhum usuário.</td></tr>
+                <tr><td colspan="5">Nenhum usuário.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

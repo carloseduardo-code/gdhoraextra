@@ -45,6 +45,11 @@ def usuario_logado():
     }
 
 
+def usuario_master():
+    user = usuario_logado()
+    return bool(user and str(user.get("usuario") or "").strip().lower() == "kadu")
+
+
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -160,6 +165,9 @@ def gerar_resumo(sol, itens):
                 linhas.append(linha_colaborador(c))
         linhas.append("")
 
+    if sol.get("observacao"):
+        linhas.append("Observação:")
+        linhas.append(sol.get("observacao") or "")
     return "\n".join(linhas).rstrip() + "\n"
 
 
@@ -179,6 +187,10 @@ def gerar_resumo_admin(sol, itens):
         qtd = int(item.get("quantidade") or 0)
         qtd_fmt = f"{qtd:02d}" if qtd < 100 else str(qtd)
         linhas.append(f"{funcao}: {qtd_fmt}")
+    if sol.get("observacao"):
+        linhas.append("")
+        linhas.append("Observação:")
+        linhas.append(sol.get("observacao") or "")
     return "\n".join(linhas)
 
 
@@ -266,12 +278,14 @@ def _opcoes_para_api(raw=None):
 
 
 def carregar_formulario_config():
-    """Campos fixos + opções editáveis, preferindo o Supabase quando disponível."""
+    """Campos fixos + opções editáveis, priorizando o arquivo local de configuração."""
+    opcoes = _opcoes_para_api(carregar_opcoes_arquivo())
+    campos = DEFAULT_CAMPOS
+    fonte = "arquivo"
+
     if supabase is not None:
         try:
             campos_res = supabase.table("form_campos").select("*").order("ordem").execute()
-            opcoes_res = supabase.table("form_opcoes").select("*").order("ordem").execute()
-
             campos = []
             for row in campos_res.data or []:
                 campos.append({
@@ -284,35 +298,15 @@ def carregar_formulario_config():
                     "ativo": row.get("ativo", True),
                     "lista_grupo": row.get("lista_grupo"),
                 })
-
-            opcoes = {}
-            for row in opcoes_res.data or []:
-                grupo = row.get("grupo") or ""
-                if not grupo:
-                    continue
-                opcoes.setdefault(grupo, []).append({
-                    "id": row.get("id"),
-                    "valor": row.get("valor"),
-                    "label": row.get("label") or row.get("valor"),
-                    "ordem": row.get("ordem", 0),
-                    "ativo": row.get("ativo", True),
-                })
-
-            if not campos:
-                campos = DEFAULT_CAMPOS
-            if not opcoes:
-                opcoes = _opcoes_para_api()
-            else:
-                opcoes = {g: sorted(v, key=lambda item: (item.get("ordem") or 0, str(item.get("valor") or ""))) for g, v in opcoes.items()}
-                opcoes = _opcoes_para_api({g: [item.get("valor") for item in v] for g, v in opcoes.items()})
-            return {"campos": campos, "opcoes": opcoes, "fonte": "supabase"}
+            if campos:
+                fonte = "supabase-campos"
         except Exception:
-            pass
+            campos = DEFAULT_CAMPOS
 
     return {
-        "campos": DEFAULT_CAMPOS,
-        "opcoes": _opcoes_para_api(),
-        "fonte": "arquivo",
+        "campos": campos,
+        "opcoes": opcoes,
+        "fonte": fonte,
     }
 
 
@@ -338,29 +332,16 @@ def admin_login():
     if session.get("user_id"):
         return redirect(url_for("admin_home"))
 
-    precisa_cadastro = auth_db.count_usuarios() == 0
     erro = None
 
     if request.method == "POST":
-        if precisa_cadastro:
-            # Primeiro usuário: cria conta admin
-            try:
-                uid = auth_db.criar_usuario(
-                    request.form.get("usuario"),
-                    request.form.get("senha"),
-                    request.form.get("nome"),
-                )
-                user = auth_db.autenticar(request.form.get("usuario"), request.form.get("senha"))
-                session["user_id"] = user["id"]
-                session["user_login"] = user["usuario"]
-                session["user_nome"] = user["nome"]
-                auditar("cadastro", "usuario", uid, {"primeiro_admin": True})
-                return redirect(url_for("admin_home"))
-            except ValueError as e:
-                erro = str(e)
-                precisa_cadastro = True
+        usuario = (request.form.get("usuario") or "").strip()
+        senha = (request.form.get("senha") or "").strip()
+
+        if not usuario or not senha:
+            erro = "Informe usuário e senha."
         else:
-            user = auth_db.autenticar(request.form.get("usuario"), request.form.get("senha"))
+            user = auth_db.autenticar(usuario, senha)
             if user:
                 session["user_id"] = user["id"]
                 session["user_login"] = user["usuario"]
@@ -373,7 +354,7 @@ def admin_login():
     return render_template(
         "admin/login.html",
         erro=erro,
-        precisa_cadastro=precisa_cadastro,
+        precisa_cadastro=False,
     )
 
 
@@ -414,26 +395,49 @@ def admin_config():
 def admin_usuarios():
     erro = None
     ok = None
+    master = usuario_master()
     if request.method == "POST":
-        try:
-            uid = auth_db.criar_usuario(
-                request.form.get("usuario"),
-                request.form.get("senha"),
-                request.form.get("nome"),
-            )
-            auditar("cadastro", "usuario", uid, {
-                "usuario": request.form.get("usuario"),
-                "criado_por": usuario_logado().get("usuario"),
-            })
-            ok = "Usuário cadastrado com sucesso."
-        except ValueError as e:
-            erro = str(e)
+        action = request.form.get("action") or "create"
+        if action == "aprovar":
+            if not master:
+                erro = "Apenas o usuário mestre pode aprovar novos acessos."
+            else:
+                try:
+                    usuario_id = int(request.form.get("usuario_id"))
+                    auth_db.atualizar_usuario_status(usuario_id, True)
+                    auditar("aprovar", "usuario", usuario_id, {
+                        "aprovado_por": usuario_logado().get("usuario"),
+                    })
+                    ok = "Usuário aprovado com sucesso."
+                except Exception as e:
+                    erro = str(e)
+        else:
+            try:
+                ativo = master
+                uid = auth_db.criar_usuario(
+                    request.form.get("usuario"),
+                    request.form.get("senha"),
+                    request.form.get("nome"),
+                    ativo=ativo,
+                )
+                auditar("cadastro", "usuario", uid, {
+                    "usuario": request.form.get("usuario"),
+                    "criado_por": usuario_logado().get("usuario"),
+                    "ativo": ativo,
+                })
+                if master:
+                    ok = "Usuário cadastrado com sucesso."
+                else:
+                    ok = "Usuário cadastrado como pendente. Aguarde aprovação do mestre."
+            except ValueError as e:
+                erro = str(e)
     return render_template(
         "admin/usuarios.html",
         user=usuario_logado(),
         usuarios=auth_db.listar_usuarios(),
         erro=erro,
         ok=ok,
+        is_master=master,
     )
 
 
@@ -497,6 +501,7 @@ def create_solicitacao():
         as_code = (data.get("as_code_outros") or "").strip()
     data_solicitacao = data.get("data_solicitacao") or data.get("data")
     turno = data.get("turno")
+    observacao = (data.get("observacao") or "").strip()
     itens = data.get("itens", [])
     equipamentos = data.get("equipamentos", [])
 
@@ -562,6 +567,7 @@ def create_solicitacao():
             "as_code": as_code or None,
             "data_solicitacao": data_solicitacao,
             "turno": turno,
+            "observacao": observacao or None,
         }
         resumo = gerar_resumo(meta, itens_norm)
         resumo_admin = gerar_resumo_admin(meta, itens_norm)
@@ -576,6 +582,7 @@ def create_solicitacao():
             "solicitante": solicitante or None,
             "setor_solicitante": setor_solicitante or None,
             "equipamento": equipamento or None,
+            "observacao": observacao or None,
             "resumo_texto": resumo,
             "resumo_admin": resumo_admin,
         }

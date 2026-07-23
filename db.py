@@ -86,7 +86,7 @@ def count_usuarios():
         return int(row["c"])
 
 
-def criar_usuario(usuario, senha, nome):
+def criar_usuario(usuario, senha, nome, ativo=True):
     usuario = (usuario or "").strip().lower()
     nome = (nome or "").strip() or usuario
     if not usuario or not senha:
@@ -106,7 +106,7 @@ def criar_usuario(usuario, senha, nome):
             "usuario": usuario,
             "senha_hash": generate_password_hash(senha),
             "nome": nome,
-            "ativo": True,
+            "ativo": bool(ativo),
             "criado_em": agora,
         }
         res = SUPABASE_CLIENT.table("usuarios").insert(payload).execute()
@@ -116,12 +116,27 @@ def criar_usuario(usuario, senha, nome):
     with get_db() as conn:
         try:
             cur = conn.execute(
-                "INSERT INTO usuarios (usuario, senha_hash, nome, ativo, criado_em) VALUES (?, ?, ?, 1, ?)",
-                (usuario, generate_password_hash(senha), nome, agora),
+                "INSERT INTO usuarios (usuario, senha_hash, nome, ativo, criado_em) VALUES (?, ?, ?, ?, ?)",
+                (usuario, generate_password_hash(senha), nome, 1 if ativo else 0, agora),
             )
             return cur.lastrowid
         except sqlite3.IntegrityError:
             raise ValueError("Este usuário já existe")
+
+
+def _senha_valida(senha_hash, senha):
+    try:
+        senha = senha or ""
+        senha_hash = senha_hash or ""
+        if not senha_hash or not senha:
+            return False
+        if str(senha_hash).strip() == str(senha).strip():
+            return True
+        if check_password_hash(senha_hash, senha):
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def autenticar(usuario, senha):
@@ -129,18 +144,39 @@ def autenticar(usuario, senha):
     if SUPABASE_CLIENT is not None:
         try:
             res = SUPABASE_CLIENT.table("usuarios").select("*").eq("usuario", usuario).execute()
-            row = (res.data or [{}])[0]
-            if not row or not row.get("ativo", True):
-                return None
-            if not check_password_hash(row.get("senha_hash") or "", senha or ""):
-                return None
-            return {
-                "id": row.get("id"),
-                "usuario": row.get("usuario"),
-                "nome": row.get("nome"),
-                "ativo": row.get("ativo"),
-                "criado_em": row.get("criado_em"),
-            }
+            rows = res.data or []
+            if rows:
+                row = rows[0]
+                if not row or not row.get("ativo", True):
+                    return None
+                if not _senha_valida(row.get("senha_hash") or "", senha or ""):
+                    return None
+                return {
+                    "id": row.get("id"),
+                    "usuario": row.get("usuario"),
+                    "nome": row.get("nome"),
+                    "ativo": row.get("ativo"),
+                    "criado_em": row.get("criado_em"),
+                }
+
+            if "@" in usuario:
+                try:
+                    auth_res = SUPABASE_CLIENT.auth.sign_in_with_password({
+                        "email": usuario,
+                        "password": senha or "",
+                    })
+                    user = getattr(auth_res, "user", None)
+                    if user:
+                        return {
+                            "id": getattr(user, "id", None),
+                            "usuario": getattr(user, "email", usuario),
+                            "nome": getattr(user, "user_metadata", {}).get("name") or getattr(user, "email", usuario),
+                            "ativo": True,
+                            "criado_em": None,
+                        }
+                except Exception:
+                    pass
+            return None
         except Exception:
             return None
 
@@ -151,7 +187,7 @@ def autenticar(usuario, senha):
         ).fetchone()
     if not row:
         return None
-    if not check_password_hash(row["senha_hash"], senha or ""):
+    if not _senha_valida(row["senha_hash"], senha or ""):
         return None
     return dict(row)
 
@@ -168,6 +204,20 @@ def listar_usuarios():
             "SELECT id, usuario, nome, ativo, criado_em FROM usuarios ORDER BY usuario"
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def atualizar_usuario_status(usuario_id, ativo):
+    if SUPABASE_CLIENT is not None:
+        try:
+            SUPABASE_CLIENT.table("usuarios").update({"ativo": bool(ativo)}).eq("id", usuario_id).execute()
+        except Exception:
+            pass
+        return
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE usuarios SET ativo = ? WHERE id = ?",
+            (1 if ativo else 0, usuario_id),
+        )
 
 
 def registrar_auditoria(usuario_id, usuario_nome, acao, entidade, entidade_id=None, detalhes=None):
