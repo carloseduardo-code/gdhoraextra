@@ -8,13 +8,16 @@
 </head>
 <body>
 <div class="container form-page">
-    <header>
-        <div>
-            <h1>Enviar solicitação</h1>
-            <p class="page-lead">Preencha os dados abaixo para solicitar hora extra / efetivo</p>
+    <div class="page-header">
+        <div class="logo-brand">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Gonçalves & Dias">
+            <div>
+                <h1>Enviar solicitação</h1>
+                <p class="page-lead">Preencha os dados abaixo para solicitar hora extra ou efetivo.</p>
+            </div>
         </div>
         <a href="{{ url_for('index') }}" class="btn-nav">Início</a>
-    </header>
+    </div>
 
     <form id="solicitacao-form" novalidate>
         <section class="form-card" id="card-dados">
@@ -56,6 +59,21 @@
             </div>
         </section>
 
+        <section class="form-card form-card-notes" id="secao-observacao">
+            <div class="form-card-header">
+                <div>
+                    <h2>Observação</h2>
+                    <p>Registre um comentário adicional para esta solicitação.</p>
+                </div>
+            </div>
+            <div class="form-card-body">
+                <div class="form-group">
+                    <label for="campo-observacao">Observação</label>
+                    <textarea id="campo-observacao" name="observacao" rows="4" placeholder="Digite aqui sua observação..."></textarea>
+                </div>
+            </div>
+        </section>
+
         <section class="form-card form-card-resumo" id="card-resumo-previa">
             <div class="form-card-header">
                 <div>
@@ -85,6 +103,7 @@
             <div class="form-group">
                 <label>Função</label>
                 <select class="funcao-select" required>
+                    <option value="">Selecione função</option>
                 </select>
             </div>
             <div class="form-group form-group-qtd">
@@ -109,6 +128,7 @@
             <div class="form-group">
                 <label>Equipamento</label>
                 <select class="equipamento-select">
+                    <option value="">Selecione equipamento</option>
                 </select>
             </div>
             <div class="form-group">
