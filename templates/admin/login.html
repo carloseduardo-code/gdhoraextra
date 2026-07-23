@@ -8,10 +8,15 @@
 </head>
 <body>
 <div class="container home-container">
-    <header class="home-header">
-        <h1>Área administrativa</h1>
-        <p class="home-subtitle">Entre com seu usuário e senha cadastrados</p>
-    </header>
+    <div class="page-header">
+        <div class="logo-brand">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Gonçalves & Dias">
+            <div>
+                <h1>Área administrativa</h1>
+                <p class="home-subtitle">Entre com seu usuário e senha cadastrados</p>
+            </div>
+        </div>
+    </div>
 
     {% if erro %}
     <p class="erro-box">{{ erro }}</p>
