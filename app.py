@@ -45,6 +45,11 @@ def usuario_logado():
     }
 
 
+def usuario_master():
+    user = usuario_logado()
+    return bool(user and str(user.get("usuario") or "").strip().lower() == "kadu")
+
+
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -160,6 +165,9 @@ def gerar_resumo(sol, itens):
                 linhas.append(linha_colaborador(c))
         linhas.append("")
 
+    if sol.get("observacao"):
+        linhas.append("Observação:")
+        linhas.append(sol.get("observacao") or "")
     return "\n".join(linhas).rstrip() + "\n"
 
 
@@ -179,6 +187,10 @@ def gerar_resumo_admin(sol, itens):
         qtd = int(item.get("quantidade") or 0)
         qtd_fmt = f"{qtd:02d}" if qtd < 100 else str(qtd)
         linhas.append(f"{funcao}: {qtd_fmt}")
+    if sol.get("observacao"):
+        linhas.append("")
+        linhas.append("Observação:")
+        linhas.append(sol.get("observacao") or "")
     return "\n".join(linhas)
 
 
@@ -383,26 +395,49 @@ def admin_config():
 def admin_usuarios():
     erro = None
     ok = None
+    master = usuario_master()
     if request.method == "POST":
-        try:
-            uid = auth_db.criar_usuario(
-                request.form.get("usuario"),
-                request.form.get("senha"),
-                request.form.get("nome"),
-            )
-            auditar("cadastro", "usuario", uid, {
-                "usuario": request.form.get("usuario"),
-                "criado_por": usuario_logado().get("usuario"),
-            })
-            ok = "Usuário cadastrado com sucesso."
-        except ValueError as e:
-            erro = str(e)
+        action = request.form.get("action") or "create"
+        if action == "aprovar":
+            if not master:
+                erro = "Apenas o usuário mestre pode aprovar novos acessos."
+            else:
+                try:
+                    usuario_id = int(request.form.get("usuario_id"))
+                    auth_db.atualizar_usuario_status(usuario_id, True)
+                    auditar("aprovar", "usuario", usuario_id, {
+                        "aprovado_por": usuario_logado().get("usuario"),
+                    })
+                    ok = "Usuário aprovado com sucesso."
+                except Exception as e:
+                    erro = str(e)
+        else:
+            try:
+                ativo = master
+                uid = auth_db.criar_usuario(
+                    request.form.get("usuario"),
+                    request.form.get("senha"),
+                    request.form.get("nome"),
+                    ativo=ativo,
+                )
+                auditar("cadastro", "usuario", uid, {
+                    "usuario": request.form.get("usuario"),
+                    "criado_por": usuario_logado().get("usuario"),
+                    "ativo": ativo,
+                })
+                if master:
+                    ok = "Usuário cadastrado com sucesso."
+                else:
+                    ok = "Usuário cadastrado como pendente. Aguarde aprovação do mestre."
+            except ValueError as e:
+                erro = str(e)
     return render_template(
         "admin/usuarios.html",
         user=usuario_logado(),
         usuarios=auth_db.listar_usuarios(),
         erro=erro,
         ok=ok,
+        is_master=master,
     )
 
 
@@ -466,6 +501,7 @@ def create_solicitacao():
         as_code = (data.get("as_code_outros") or "").strip()
     data_solicitacao = data.get("data_solicitacao") or data.get("data")
     turno = data.get("turno")
+    observacao = (data.get("observacao") or "").strip()
     itens = data.get("itens", [])
     equipamentos = data.get("equipamentos", [])
 
@@ -531,6 +567,7 @@ def create_solicitacao():
             "as_code": as_code or None,
             "data_solicitacao": data_solicitacao,
             "turno": turno,
+            "observacao": observacao or None,
         }
         resumo = gerar_resumo(meta, itens_norm)
         resumo_admin = gerar_resumo_admin(meta, itens_norm)
@@ -545,6 +582,7 @@ def create_solicitacao():
             "solicitante": solicitante or None,
             "setor_solicitante": setor_solicitante or None,
             "equipamento": equipamento or None,
+            "observacao": observacao or None,
             "resumo_texto": resumo,
             "resumo_admin": resumo_admin,
         }
