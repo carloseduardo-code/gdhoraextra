@@ -1,10 +1,13 @@
 let formConfig = { campos: [], opcoes: {} };
 let funcoes = [];
 let efetivo = [];
-let buscaDebounce = null;
 let previaDebounce = null;
 
 const CAMPOS_SKIP = new Set(['equipamento', 'funcoes']); // equipamento vai para seção própria
+
+const TOTAL_ETAPAS = 4;
+let etapaAtual = 1;
+let maiorEtapaAlcancada = 1;
 
 document.addEventListener('DOMContentLoaded', async () => {
     try {
@@ -29,14 +32,101 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('solicitacao-form').addEventListener('input', agendarResumoPrevia);
     document.getElementById('solicitacao-form').addEventListener('change', agendarResumoPrevia);
 
-    const busca = document.getElementById('busca-colab-global');
-    if (busca) {
-        busca.addEventListener('input', () => {
-            clearTimeout(buscaDebounce);
-            buscaDebounce = setTimeout(filtrarColaboradoresVisiveis, 200);
-        });
-    }
+    initWizard();
 });
+
+/* ---------- Wizard (etapas) ---------- */
+function initWizard() {
+    document.getElementById('btn-proximo').addEventListener('click', () => {
+        if (etapaAtual === 1 && !validarEtapa1()) return;
+        if (etapaAtual === 3 && !validarEtapa3()) return;
+        mostrarEtapa(Math.min(etapaAtual + 1, TOTAL_ETAPAS));
+    });
+
+    document.getElementById('btn-voltar').addEventListener('click', () => {
+        mostrarEtapa(Math.max(etapaAtual - 1, 1));
+    });
+
+    document.querySelectorAll('.wizard-step').forEach(pill => {
+        pill.addEventListener('click', () => {
+            const alvo = Number(pill.dataset.stepIndicator);
+            if (alvo <= maiorEtapaAlcancada) mostrarEtapa(alvo);
+        });
+    });
+
+    mostrarEtapa(1, { semScroll: true });
+}
+
+function mostrarEtapa(n, opts) {
+    mostrarErro('');
+    etapaAtual = n;
+    if (n > maiorEtapaAlcancada) maiorEtapaAlcancada = n;
+
+    document.querySelectorAll('[data-step]').forEach(el => {
+        el.hidden = Number(el.dataset.step) !== n;
+    });
+
+    document.querySelectorAll('.wizard-step').forEach(pill => {
+        const s = Number(pill.dataset.stepIndicator);
+        pill.classList.toggle('active', s === n);
+        pill.classList.toggle('done', s !== n && s <= maiorEtapaAlcancada);
+    });
+
+    document.getElementById('btn-voltar').hidden = n === 1;
+    document.getElementById('btn-proximo').hidden = n === TOTAL_ETAPAS;
+    document.getElementById('btn-enviar').hidden = n !== TOTAL_ETAPAS;
+
+    if (n === TOTAL_ETAPAS) atualizarResumoPrevia();
+
+    if (!opts?.semScroll) {
+        const form = document.getElementById('solicitacao-form');
+        if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+function irParaPrimeiroErro() {
+    const el = document.querySelector('.campo-invalido, .is-invalid');
+    if (!el) return;
+    const stepEl = el.closest('[data-step]');
+    const step = stepEl ? Number(stepEl.dataset.step) : null;
+    if (step && step !== etapaAtual) {
+        const msgAtual = document.getElementById('form-erro')?.textContent || '';
+        mostrarEtapa(step);
+        mostrarErro(msgAtual);
+    }
+    setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+}
+
+function validarEtapa1() {
+    const campos = coletarCamposForm();
+    const { ok, msg } = validarCamposObrigatorios(campos);
+    if (!ok) {
+        mostrarErro(msg);
+        document.querySelector('.campo-invalido')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return ok;
+}
+
+function validarEtapa3() {
+    mostrarErro('');
+    let ok = true;
+    let msg = '';
+    document.querySelectorAll('.bloco-equipamento').forEach(bloco => {
+        const eq = bloco.querySelector('.equipamento-select');
+        const op = bloco.querySelector('.operador-valor');
+        const temEq = !!eq?.value;
+        const temOp = !!(op?.value);
+        if (temOp && !temEq) {
+            marcarInvalido(eq, true);
+            ok = false;
+            msg = msg || 'Selecione o equipamento correspondente ao operador informado.';
+        } else {
+            marcarInvalido(eq, false);
+        }
+    });
+    if (!ok) mostrarErro(msg);
+    return ok;
+}
 
 async function carregarFormulario() {
     const res = await fetch('/api/formulario');
@@ -95,8 +185,9 @@ function setupSearchSelect(selectEl) {
     input.type = 'text';
     input.className = 'searchable-input';
     input.autocomplete = 'off';
-    input.placeholder = '';
+    input.placeholder = 'Buscar ou selecionar...';
     input.setAttribute('aria-label', 'Filtrar opções');
+    if (selectEl.id) input.id = `${selectEl.id}-busca`;
 
     const listBox = document.createElement('div');
     listBox.className = 'searchable-list';
@@ -109,6 +200,8 @@ function setupSearchSelect(selectEl) {
 
     selectEl.dataset.searchableReady = 'true';
     selectEl.style.display = 'none';
+    selectEl.setAttribute('aria-hidden', 'true');
+    selectEl.tabIndex = -1;
 
     const renderList = () => {
         const q = (input.value || '').trim().toLowerCase();
@@ -192,6 +285,7 @@ function renderCampos() {
         group.appendChild(label);
 
         if (campo.chave === 'solicitante') {
+            label.htmlFor = `campo-${campo.chave}-busca`;
             group.appendChild(criarComboboxEfetivo('solicitante', !!campo.obrigatorio));
         } else if (campo.tipo === 'text' || campo.tipo === 'date') {
             const input = document.createElement('input');
@@ -201,6 +295,12 @@ function renderCampos() {
             input.required = !!campo.obrigatorio;
             if (campo.tipo === 'date') input.classList.add('date-picker');
             group.appendChild(input);
+            if (campo.chave === 'data_solicitacao') {
+                const hint = document.createElement('p');
+                hint.className = 'campo-hint';
+                hint.textContent = 'Informe a data em que a hora extra/efetivo será realizada — não a data de preenchimento deste formulário.';
+                group.appendChild(hint);
+            }
         } else if (campo.tipo === 'select' || campo.chave === 'as_code') {
             const select = document.createElement('select');
             select.id = `campo-${campo.chave}`;
@@ -216,6 +316,7 @@ function renderCampos() {
             });
             group.appendChild(select);
             setupSearchSelect(select);
+            label.htmlFor = `campo-${campo.chave}-busca`;
 
             if (campo.chave === 'as_code') {
                 const outrosWrap = document.createElement('div');
@@ -346,7 +447,7 @@ function setupCombobox(wrap, listaFonte, onSelect, onClear) {
 
 /* ---------- Funções (lógica preservada) ---------- */
 function popularSelect(selectEl) {
-    selectEl.innerHTML = '<option value=""></option>';
+    selectEl.innerHTML = '<option value="">Selecione a Função</option>';
     funcoes.forEach(f => {
         const opt = document.createElement('option');
         opt.value = f;
@@ -365,6 +466,7 @@ function adicionarBloco() {
     const select = bloco.querySelector('.funcao-select');
     const qtdInput = bloco.querySelector('.quantidade-input');
     const divColab = bloco.querySelector('.colaboradores-container');
+    const buscaBloco = bloco.querySelector('.busca-colab-bloco');
 
     popularSelect(select);
     setupSearchSelect(select);
@@ -374,11 +476,18 @@ function adicionarBloco() {
         atualizarResumoPrevia();
     });
 
+    let buscaBlocoDebounce = null;
+    buscaBloco.addEventListener('input', () => {
+        clearTimeout(buscaBlocoDebounce);
+        buscaBlocoDebounce = setTimeout(() => filtrarColaboradoresBloco(divColab, buscaBloco.value), 200);
+    });
+
     bloco.querySelector('.btn-remover-bloco').addEventListener('click', () => {
         if (container.querySelectorAll('.bloco-funcao').length <= 1) {
             select.value = '';
             divColab.innerHTML = '';
             qtdInput.value = 0;
+            buscaBloco.value = '';
             atualizarResumoPrevia();
             return;
         }
@@ -417,23 +526,23 @@ async function carregarColaboradores(funcao, container, qtdInput, bloco) {
             label.appendChild(document.createTextNode(` ${col.matricula} - ${col.nome}`));
             container.appendChild(label);
         });
-        filtrarColaboradoresVisiveis();
+        filtrarColaboradoresBloco(container, bloco?.querySelector('.busca-colab-bloco')?.value);
         atualizarQuantidade(container, qtdInput);
     } catch {
         container.innerHTML = '<span class="erro-inline">Erro ao carregar colaboradores</span>';
     }
 }
 
-function filtrarColaboradoresVisiveis() {
-    const q = (document.getElementById('busca-colab-global')?.value || '').trim().toLowerCase();
-    document.querySelectorAll('.colaboradores-container label').forEach(label => {
-        if (!q) {
+function filtrarColaboradoresBloco(container, q) {
+    const ql = (q || '').trim().toLowerCase();
+    container.querySelectorAll('label').forEach(label => {
+        if (!ql) {
             label.style.display = '';
             return;
         }
         const mat = label.dataset.matricula || '';
         const nome = label.dataset.nome || '';
-        label.style.display = (mat.includes(q) || nome.includes(q)) ? '' : 'none';
+        label.style.display = (mat.includes(ql) || nome.includes(ql)) ? '' : 'none';
     });
 }
 
@@ -444,7 +553,7 @@ function atualizarQuantidade(container, qtdInput) {
 
 /* ---------- Equipamentos ---------- */
 function popularSelectEquipamento(selectEl) {
-    selectEl.innerHTML = '<option value=""></option>';
+    selectEl.innerHTML = '<option value="">Selecione o Equipamento</option>';
     const opts = formConfig.opcoes.equipamento || [];
     opts.forEach(o => {
         const opt = document.createElement('option');
@@ -547,8 +656,7 @@ function coletarItensFuncoes() {
     return itens;
 }
 
-function validarFormulario(campos, itens, equipamentos) {
-    mostrarErro('');
+function validarCamposObrigatorios(campos) {
     let ok = true;
     let msg = '';
 
@@ -578,29 +686,23 @@ function validarFormulario(campos, itens, equipamentos) {
         }
     }
 
-    // Equipamentos incompletos
-    document.querySelectorAll('.bloco-equipamento').forEach(bloco => {
-        const eq = bloco.querySelector('.equipamento-select');
-        const op = bloco.querySelector('.operador-valor');
-        const temEq = !!eq?.value;
-        const temOp = !!(op?.value);
-        if (temEq && !temOp) {
-            marcarInvalido(bloco.querySelector('.operador-busca'), true);
-            ok = false;
-            msg = msg || 'Selecione o operador de cada equipamento.';
-        } else if (temOp && !temEq) {
-            marcarInvalido(eq, true);
-            ok = false;
-            msg = msg || 'Selecione o equipamento para cada operador.';
-        } else {
-            marcarInvalido(eq, false);
-            marcarInvalido(bloco.querySelector('.operador-busca'), false);
-        }
-    });
+    return { ok, msg };
+}
+
+function validarFormulario(campos, itens, equipamentos) {
+    mostrarErro('');
+    const { ok: camposOk, msg: camposMsg } = validarCamposObrigatorios(campos);
+    let ok = camposOk;
+    let msg = camposMsg;
+
+    if (!validarEtapa3()) {
+        ok = false;
+        msg = msg || document.getElementById('form-erro')?.textContent || 'Verifique os equipamentos informados.';
+    }
 
     if (!itens.length && !equipamentos.length) {
         ok = false;
-        msg = msg || 'Adicione pelo menos uma função com colaboradores ou um equipamento com operador.';
+        msg = msg || 'Adicione pelo menos uma função com colaboradores ou um equipamento.';
     }
 
     if (!ok) mostrarErro(msg);
@@ -658,12 +760,14 @@ function atualizarResumoPrevia() {
 
 async function enviarSolicitacao(e) {
     e.preventDefault();
+    if (etapaAtual !== TOTAL_ETAPAS) return;
+
     const campos = coletarCamposForm();
     const itens = coletarItensFuncoes();
     const equipamentos = coletarEquipamentos();
 
     if (!validarFormulario(campos, itens, equipamentos)) {
-        document.querySelector('.campo-invalido')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        irParaPrimeiroErro();
         return;
     }
 

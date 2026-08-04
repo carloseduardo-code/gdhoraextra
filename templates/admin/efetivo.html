@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Efetivo - Admin</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -27,7 +28,7 @@
 
     <div class="toolbar">
         <div class="search-box">
-            <input type="search" id="busca" placeholder="Pesquisar por matrícula ou nome...">
+            <input type="search" id="busca" placeholder="Pesquisar por matrícula ou nome..." aria-label="Pesquisar colaborador">
         </div>
         <span id="total-registros">Total: 0</span>
     </div>
@@ -41,18 +42,20 @@
     </div>
     <p class="hint">Ao importar, o efetivo anterior é removido e substituído pela nova planilha.</p>
 
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Matrícula</th>
-                <th>Nome</th>
-                <th>Função</th>
-            </tr>
-        </thead>
-        <tbody id="efetivo-body">
-            <tr><td colspan="3">Carregando...</td></tr>
-        </tbody>
-    </table>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Matrícula</th>
+                    <th>Nome</th>
+                    <th>Função</th>
+                </tr>
+            </thead>
+            <tbody id="efetivo-body">
+                <tr><td colspan="3">Carregando...</td></tr>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <script src="{{ url_for('static', filename='efetivo.js') }}"></script>

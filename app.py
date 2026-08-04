@@ -198,7 +198,7 @@ DEFAULT_CAMPOS = [
     {"id": 0, "chave": "solicitante", "label": "Solicitante", "tipo": "efetivo", "obrigatorio": True, "ordem": 10, "ativo": True, "lista_grupo": None},
     {"id": 0, "chave": "setor_solicitante", "label": "Setor Solicitante", "tipo": "select", "obrigatorio": True, "ordem": 20, "ativo": True, "lista_grupo": "setor_solicitante"},
     {"id": 0, "chave": "as_code", "label": "AS (Área de Serviço)", "tipo": "select", "obrigatorio": True, "ordem": 40, "ativo": True, "lista_grupo": "as_code"},
-    {"id": 0, "chave": "data_solicitacao", "label": "Data da solicitação", "tipo": "date", "obrigatorio": True, "ordem": 50, "ativo": True, "lista_grupo": None},
+    {"id": 0, "chave": "data_solicitacao", "label": "Data da Hora Extra", "tipo": "date", "obrigatorio": True, "ordem": 50, "ativo": True, "lista_grupo": None},
     {"id": 0, "chave": "turno", "label": "Turno", "tipo": "radio", "obrigatorio": True, "ordem": 60, "ativo": True, "lista_grupo": "turno"},
     {"id": 0, "chave": "funcoes", "label": "Funções e Colaboradores", "tipo": "funcoes", "obrigatorio": True, "ordem": 70, "ativo": True, "lista_grupo": None},
 ]
@@ -505,6 +505,9 @@ def create_solicitacao():
     itens = data.get("itens", [])
     equipamentos = data.get("equipamentos", [])
 
+    if not solicitante:
+        return jsonify({"error": "Solicitante é obrigatório"}), 400
+
     if not data_solicitacao:
         return jsonify({"error": "Data da solicitação é obrigatória"}), 400
 
@@ -728,36 +731,53 @@ def exportar_excel():
         )
         linhas = []
         for sol in sol_res.data or []:
-            solicitante = sol.get("solicitante") or ""
+            data_he = formatar_data_br(sol.get("data_solicitacao"))
             setor = sol.get("setor_solicitante") or sol.get("setor") or ""
-            equipamento = sol.get("equipamento") or ""
+            quem_solicitou = sol.get("solicitante") or ""
+            as_code = sol.get("as_code") or ""
+
             for item in sol.get("solicitacao_itens") or []:
-                funcao = item.get("funcao") or ""
-                for c in item.get("colaboradores") or []:
+                tipo = item.get("tipo") or "funcao"
+                equipamento_nome = item.get("equipamento") or (item.get("funcao") if tipo == "equipamento" else "") or ""
+                colaboradores = item.get("colaboradores") or []
+
+                if not colaboradores:
+                    if tipo == "equipamento":
+                        linhas.append({
+                            "Data da Hora Extra": data_he,
+                            "Solicitante": setor,
+                            "Quem solicitou": quem_solicitou,
+                            "AS da solicitação": as_code,
+                            "Colaborador": "",
+                            "Matrícula": "",
+                            "Equipamento": equipamento_nome,
+                        })
+                    continue
+
+                for c in colaboradores:
                     c = normalizar_colaborador(c)
                     if c.get("a_procura"):
-                        linhas.append({
-                            "Solicitante": solicitante,
-                            "Setor": setor,
-                            "Equipamento": equipamento,
-                            "Matrícula": c.get("matricula") or "01",
-                            "Nome": f"{c.get('descricao') or c.get('nome')} (À procura...)",
-                            "Função": funcao,
-                        })
+                        nome = f"{c.get('descricao') or c.get('nome')} (À procura...)"
+                        matricula = c.get("matricula") or "01"
                     else:
-                        linhas.append({
-                            "Solicitante": solicitante,
-                            "Setor": setor,
-                            "Equipamento": equipamento,
-                            "Matrícula": c.get("matricula") or "",
-                            "Nome": c.get("nome") or "",
-                            "Função": funcao,
-                        })
+                        nome = c.get("nome") or ""
+                        matricula = c.get("matricula") or ""
+                    linhas.append({
+                        "Data da Hora Extra": data_he,
+                        "Solicitante": setor,
+                        "Quem solicitou": quem_solicitou,
+                        "AS da solicitação": as_code,
+                        "Colaborador": nome,
+                        "Matrícula": matricula,
+                        "Equipamento": equipamento_nome if tipo == "equipamento" else "",
+                    })
+
         if not linhas:
             return jsonify({"error": "Nenhum dado para exportar"}), 404
 
         df = pd.DataFrame(linhas, columns=[
-            "Solicitante", "Setor", "Equipamento", "Matrícula", "Nome", "Função"
+            "Data da Hora Extra", "Solicitante", "Quem solicitou",
+            "AS da solicitação", "Colaborador", "Matrícula", "Equipamento",
         ])
         output = BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hora Extra</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -16,15 +17,9 @@
                 <p class="home-subtitle">Área pública — solicitações de efetivo</p>
             </div>
         </div>
-        <a href="{{ url_for('admin_login') }}" class="btn-nav">Acesso administrativo</a>
     </div>
 
-    <nav class="menu-grid" aria-label="Menu público">
-        <a href="{{ url_for('solicitacao') }}" class="menu-card">
-            <span class="menu-card-title">Enviar Solicitação</span>
-            <span class="menu-card-desc">Preencher e enviar pedido de hora extra / efetivo</span>
-        </a>
-    </nav>
+    <a href="{{ url_for('solicitacao') }}" class="btn-primary btn-home-cta">Enviar Solicitação</a>
 
     <p class="home-admin-link">
         <a href="{{ url_for('admin_login') }}">Acesso administrativo</a>
