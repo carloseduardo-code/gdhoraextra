@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auditoria - Admin</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -28,35 +29,37 @@
     <p class="hint">Histórico de login, remoções e alterações feitas pelos usuários administrativos.</p>
 
     <div class="search-box" style="margin-bottom:14px;">
-        <input type="search" id="busca-audit" placeholder="Filtrar por usuário, ação ou solicitação...">
+        <input type="search" id="busca-audit" placeholder="Filtrar por usuário, ação ou solicitação..." aria-label="Filtrar auditoria">
     </div>
 
-    <table class="data-table" id="tabela-audit">
-        <thead>
-            <tr>
-                <th>Quando</th>
-                <th>Usuário</th>
-                <th>Ação</th>
-                <th>Entidade</th>
-                <th>ID</th>
-                <th>Detalhes</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for log in logs %}
-            <tr>
-                <td>{{ log.criado_em }}</td>
-                <td>{{ log.usuario_nome }}</td>
-                <td>{{ log.acao }}</td>
-                <td>{{ log.entidade }}</td>
-                <td>{{ log.entidade_id or '—' }}</td>
-                <td class="td-detalhe"><code>{{ log.detalhes or '' }}</code></td>
-            </tr>
-            {% else %}
-            <tr><td colspan="6">Nenhum registro ainda.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-responsive">
+        <table class="data-table" id="tabela-audit">
+            <thead>
+                <tr>
+                    <th>Quando</th>
+                    <th>Usuário</th>
+                    <th>Ação</th>
+                    <th>Entidade</th>
+                    <th>ID</th>
+                    <th>Detalhes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td>{{ log.criado_em }}</td>
+                    <td>{{ log.usuario_nome }}</td>
+                    <td>{{ log.acao }}</td>
+                    <td>{{ log.entidade }}</td>
+                    <td>{{ log.entidade_id or '—' }}</td>
+                    <td class="td-detalhe"><code>{{ log.detalhes or '' }}</code></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6">Nenhum registro ainda.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 <script>
 document.getElementById('busca-audit').addEventListener('input', (e) => {
@@ -64,6 +67,15 @@ document.getElementById('busca-audit').addEventListener('input', (e) => {
     document.querySelectorAll('#tabela-audit tbody tr').forEach(tr => {
         tr.style.display = !q || tr.textContent.toLowerCase().includes(q) ? '' : 'none';
     });
+});
+
+document.querySelectorAll('#tabela-audit .td-detalhe code').forEach((el) => {
+    try {
+        const parsed = JSON.parse(el.textContent);
+        el.textContent = JSON.stringify(parsed, null, 2);
+    } catch {
+        /* não é JSON válido, mantém texto original */
+    }
 });
 </script>
 </body>

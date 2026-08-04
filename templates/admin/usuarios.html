@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Usuários - Admin</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -31,48 +32,50 @@
     <section class="config-section">
         <h2>Cadastrar novo usuário</h2>
         <p class="home-subtitle">Novos usuários ficarão pendentes até aprovação do mestre Kadu.</p>
-        <form method="post" class="inline-form">
-            <input name="nome" placeholder="Nome" required>
-            <input name="usuario" placeholder="Usuário" required>
-            <input name="senha" type="password" placeholder="Senha" required>
+        <form method="post" class="inline-form" autocomplete="off">
+            <input name="nome" placeholder="Nome" required autocomplete="off">
+            <input name="usuario" placeholder="Usuário" required autocomplete="off">
+            <input name="senha" type="password" placeholder="Senha" required autocomplete="new-password">
             <button type="submit" class="btn-secondary">Cadastrar</button>
         </form>
     </section>
 
     <section class="config-section">
         <h2>Usuários cadastrados</h2>
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Nome</th>
-                    <th>Usuário</th>
-                    <th>Desde</th>
-                    <th>Status</th>
-                    <th>Ação</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for u in usuarios %}
-                <tr>
-                    <td>{{ u.nome }}</td>
-                    <td>{{ u.usuario }}</td>
-                    <td>{{ u.criado_em }}</td>
-                    <td>{% if u.ativo %}Ativo{% else %}Pendente{% endif %}</td>
-                    <td>
-                        {% if not u.ativo and is_master %}
-                        <form method="post" style="display:inline;">
-                            <input type="hidden" name="action" value="aprovar">
-                            <input type="hidden" name="usuario_id" value="{{ u.id }}">
-                            <button type="submit" class="btn-secondary">Aprovar</button>
-                        </form>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="5">Nenhum usuário.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Usuário</th>
+                        <th>Desde</th>
+                        <th>Status</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in usuarios %}
+                    <tr>
+                        <td>{{ u.nome }}</td>
+                        <td>{{ u.usuario }}</td>
+                        <td>{{ u.criado_em }}</td>
+                        <td>{% if u.ativo %}Ativo{% else %}Pendente{% endif %}</td>
+                        <td>
+                            {% if not u.ativo and is_master %}
+                            <form method="post" style="display:inline;">
+                                <input type="hidden" name="action" value="aprovar">
+                                <input type="hidden" name="usuario_id" value="{{ u.id }}">
+                                <button type="submit" class="btn-secondary">Aprovar</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5">Nenhum usuário.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </section>
 </div>
 </body>

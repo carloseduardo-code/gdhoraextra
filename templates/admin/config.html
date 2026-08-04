@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configuração - Admin</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -35,10 +36,10 @@
 
     <section class="config-section">
         <h2 id="titulo-grupo">Equipamento</h2>
-        <div id="lista-opcoes">Carregando...</div>
+        <div id="lista-opcoes" class="table-responsive">Carregando...</div>
 
         <form id="form-nova-opcao" class="inline-form">
-            <input name="valor" placeholder="Nova opção..." required>
+            <input name="valor" placeholder="Nova opção..." required aria-label="Nova opção">
             <button type="submit" class="btn-secondary">Adicionar</button>
         </form>
         <p id="config-status" class="status-inline" hidden></p>

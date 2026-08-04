@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Solicitações - Admin</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -27,7 +28,7 @@
 
     <div class="toolbar">
         <div class="search-box">
-            <input type="search" id="busca" placeholder="Pesquisar por solicitante, setor, equipamento, função...">
+            <input type="search" id="busca" placeholder="Pesquisar por solicitante, setor, equipamento, função..." aria-label="Pesquisar solicitações">
         </div>
         <button type="button" class="btn-export" id="btn-exportar">Exportar Excel</button>
     </div>
