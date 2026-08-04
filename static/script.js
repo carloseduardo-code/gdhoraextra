@@ -447,7 +447,7 @@ function setupCombobox(wrap, listaFonte, onSelect, onClear) {
 
 /* ---------- Funções (lógica preservada) ---------- */
 function popularSelect(selectEl) {
-    selectEl.innerHTML = '<option value="">Selecione função</option>';
+    selectEl.innerHTML = '<option value="">Selecione a Função</option>';
     funcoes.forEach(f => {
         const opt = document.createElement('option');
         opt.value = f;
@@ -553,7 +553,7 @@ function atualizarQuantidade(container, qtdInput) {
 
 /* ---------- Equipamentos ---------- */
 function popularSelectEquipamento(selectEl) {
-    selectEl.innerHTML = '<option value="">Selecione equipamento</option>';
+    selectEl.innerHTML = '<option value="">Selecione o Equipamento</option>';
     const opts = formConfig.opcoes.equipamento || [];
     opts.forEach(o => {
         const opt = document.createElement('option');

@@ -7,12 +7,26 @@
     "ALMOXERIFADO",
     "MEIO AMBIENTE",
     "SAUDE",
-    "PRODUÇÃO"
+    "PRODUÇÃO",
+    "MEDIÇÃO"
   ],
   "equipamento": [
-    "Basculante",
-    "Retroescavadeira",
-    "Veiculo Passageiro"
+    "TRATOR DE ESTEIRA",
+    "MINI CARREGADEIRA",
+    "MINI ROLO",
+    "MINI ESCAVADEIRA",
+    "MINI ESCAVADEIRA C/ROMPEDOR",
+    "MOTO NIVELADORA",
+    "CAMINHÃO PIPA BRUTA",
+    "CAMINHÃO PIPA POTAVEL",
+    "CAMINHÃO BASCULANTE",
+    "CAMINHÃO MUNK",
+    "CAMINHÃO 3/4",
+    "ESCAVADEIRA",
+    "VEICULO PASSAGEIRO",
+    "ONIBUS",
+    "CAMINHONETE"
+    
   ],
   "as_code": [
     "AS_005 - EQUIPE ADMINISTRATIVA",
