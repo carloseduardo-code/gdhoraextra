@@ -298,7 +298,7 @@ function renderCampos() {
             if (campo.chave === 'data_solicitacao') {
                 const hint = document.createElement('p');
                 hint.className = 'campo-hint';
-                hint.textContent = 'Informe a data em que a hora extra/efetivo será realizada — não a data de preenchimento deste formulário.';
+                hint.textContent = 'Informe a data em que a hora extra será realizada.';
                 group.appendChild(hint);
             }
         } else if (campo.tipo === 'select' || campo.chave === 'as_code') {
