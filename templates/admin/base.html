@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+{% include "_head.html" %}
+</head>
+<body>
+<div class="container wide">
+    <div class="admin-shell">
+        <div class="admin-header">
+            <div class="admin-header-row">
+                <div class="admin-brand">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="">
+                    <div class="hero-divider"></div>
+                    <span class="admin-brand-title">Administração</span>
+                </div>
+                <div class="admin-user">
+                    <span class="admin-user-chip">
+                        <span class="admin-user-avatar">{{ (user.nome or user.usuario or '?')[:2]|upper }}</span>
+                        <span class="admin-user-name">{{ user.nome or user.usuario }}</span>
+                    </span>
+                    <a href="{{ url_for('admin_logout') }}" title="Sair" class="btn-icon">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path></svg>
+                    </a>
+                </div>
+            </div>
+            <div class="admin-tabs">
+                <div class="admin-tabs-row">
+                    {% set tabs = [
+                        ('admin_home', url_for('admin_home'), 'Visão geral'),
+                        ('admin_solicitacoes', url_for('admin_solicitacoes'), 'Solicitações'),
+                        ('admin_efetivo', url_for('admin_efetivo'), 'Efetivo'),
+                        ('admin_config', url_for('admin_config'), 'Configuração'),
+                        ('admin_usuarios', url_for('admin_usuarios'), 'Usuários'),
+                        ('admin_auditoria', url_for('admin_auditoria'), 'Auditoria'),
+                    ] %}
+                    {% for endpoint, href, label in tabs %}
+                    <a href="{{ href }}" class="admin-tab{{ ' active' if request.endpoint == endpoint else '' }}">{{ label }}<span class="admin-tab-indicator"></span></a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="admin-content">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

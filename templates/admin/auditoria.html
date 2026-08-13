@@ -1,82 +1,61 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auditoria - Admin</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-<div class="container wide">
-    <header>
+{% extends "admin/base.html" %}
+{% set page_title = "Auditoria - Admin" %}
+
+{% block content %}
+<div class="page-title-row">
+    <div>
         <h1>Auditoria</h1>
-        <div class="header-actions-inline">
-            <span class="user-chip">{{ user.nome }}</span>
-            <a href="{{ url_for('admin_home') }}" class="btn-nav">Menu</a>
-            <a href="{{ url_for('admin_logout') }}" class="btn-nav">Sair</a>
-        </div>
-    </header>
-
-    <nav class="page-nav">
-        <a href="{{ url_for('admin_solicitacoes') }}" class="page-nav-link">Solicitações</a>
-        <a href="{{ url_for('admin_efetivo') }}" class="page-nav-link">Efetivo</a>
-        <a href="{{ url_for('admin_config') }}" class="page-nav-link">Configuração</a>
-        <a href="{{ url_for('admin_usuarios') }}" class="page-nav-link">Usuários</a>
-        <a href="{{ url_for('admin_auditoria') }}" class="page-nav-link active">Auditoria</a>
-    </nav>
-
-    <p class="hint">Histórico de login, remoções e alterações feitas pelos usuários administrativos.</p>
-
-    <div class="search-box" style="margin-bottom:14px;">
-        <input type="search" id="busca-audit" placeholder="Filtrar por usuário, ação ou solicitação..." aria-label="Filtrar auditoria">
-    </div>
-
-    <div class="table-responsive">
-        <table class="data-table" id="tabela-audit">
-            <thead>
-                <tr>
-                    <th>Quando</th>
-                    <th>Usuário</th>
-                    <th>Ação</th>
-                    <th>Entidade</th>
-                    <th>ID</th>
-                    <th>Detalhes</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for log in logs %}
-                <tr>
-                    <td>{{ log.criado_em }}</td>
-                    <td>{{ log.usuario_nome }}</td>
-                    <td>{{ log.acao }}</td>
-                    <td>{{ log.entidade }}</td>
-                    <td>{{ log.entidade_id or '—' }}</td>
-                    <td class="td-detalhe"><code>{{ log.detalhes or '' }}</code></td>
-                </tr>
-                {% else %}
-                <tr><td colspan="6">Nenhum registro ainda.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <p>Login, remoções e alterações feitas pelos usuários administrativos.</p>
     </div>
 </div>
+
+<div class="search-box-inline" style="position:relative;max-width:420px;">
+    <input type="search" id="busca-audit" placeholder="Filtrar por usuário, ação ou solicitação…" aria-label="Filtrar auditoria" style="padding-left:38px;">
+    <span style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+    </span>
+</div>
+
+<div class="audit-list" id="audit-list" style="margin-top:18px;">
+    {% for log in logs %}
+    <div class="audit-row" data-busca="{{ log.busca }}">
+        <div class="audit-icon" style="background:{{ log.icon_bg }};color:{{ log.icon_fg }};">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="{{ log.icon }}"></path></svg>
+        </div>
+        <div class="audit-body">
+            <div class="audit-line">
+                <span class="audit-usuario">{{ log.usuario }}</span>
+                <span class="audit-frase">{{ log.frase }}</span>
+                <span class="audit-quando">{{ log.quando }}</span>
+            </div>
+            {% if log.has_det %}
+            <pre class="audit-detalhes">{{ log.detalhes }}</pre>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state" style="border:none;box-shadow:none;">
+        <div class="empty-state-title">Nenhum registro ainda</div>
+    </div>
+    {% endfor %}
+    <div class="empty-state" id="audit-empty" hidden style="border:none;box-shadow:none;">
+        <div class="empty-state-title">Nenhum registro para este filtro</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
 document.getElementById('busca-audit').addEventListener('input', (e) => {
     const q = e.target.value.trim().toLowerCase();
-    document.querySelectorAll('#tabela-audit tbody tr').forEach(tr => {
-        tr.style.display = !q || tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+    let visiveis = 0;
+    document.querySelectorAll('#audit-list .audit-row').forEach(row => {
+        const bate = !q || (row.dataset.busca || '').includes(q);
+        row.style.display = bate ? '' : 'none';
+        if (bate) visiveis += 1;
     });
-});
-
-document.querySelectorAll('#tabela-audit .td-detalhe code').forEach((el) => {
-    try {
-        const parsed = JSON.parse(el.textContent);
-        el.textContent = JSON.stringify(parsed, null, 2);
-    } catch {
-        /* não é JSON válido, mantém texto original */
-    }
+    const vazio = document.getElementById('audit-empty');
+    if (vazio) vazio.hidden = !q || visiveis > 0;
 });
 </script>
-</body>
-</html>
+{% endblock %}

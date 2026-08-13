@@ -1,7 +1,7 @@
 const LABELS = {
     equipamento: 'Equipamento',
-    setor_solicitante: 'Setor',
-    as_code: 'AS',
+    setor_solicitante: 'Setor solicitante',
+    as_code: 'AS — Área de serviço',
 };
 
 let grupoAtual = 'equipamento';
@@ -22,56 +22,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function carregarOpcoes() {
     const box = document.getElementById('lista-opcoes');
-    box.innerHTML = '<p>Carregando...</p>';
+    box.innerHTML = '<p class="hint" style="padding:16px 18px;margin:0;">Carregando...</p>';
     try {
-        const res = await fetch('/api/admin/config/opcoes?grupo=' + encodeURIComponent(grupoAtual));
-        const dados = await res.json();
-        if (!res.ok) throw new Error(dados.error || 'Erro ao carregar');
+        const res = await fetch('/api/admin/config/opcoes');
+        const todos = await res.json();
+        if (!res.ok) throw new Error(todos.error || 'Erro ao carregar');
 
+        Object.keys(LABELS).forEach(g => {
+            const pill = document.querySelector(`[data-count-for="${g}"]`);
+            if (pill) pill.textContent = (todos[g] || []).length;
+        });
+
+        const dados = todos[grupoAtual] || [];
         if (!dados.length) {
-            box.innerHTML = '<p>Nenhuma opção cadastrada. Adicione abaixo.</p>';
+            box.innerHTML = '<p class="hint" style="padding:16px 18px;margin:0;">Nenhuma opção cadastrada. Adicione acima.</p>';
             return;
         }
 
-        box.innerHTML = `<table class="data-table">
-            <thead><tr><th style="width:70%">Opção</th><th></th></tr></thead>
-            <tbody>${dados.map(o => `
-                <tr data-id="${o.id}">
-                    <td><input type="text" class="inp-valor" value="${escAttr(o.valor)}"></td>
-                    <td class="td-acoes">
-                        <button type="button" class="btn-secondary btn-salvar-opcao">Salvar</button>
-                        <button type="button" class="btn-secondary btn-remover-opcao">Remover</button>
-                    </td>
-                </tr>
-            `).join('')}</tbody>
-        </table>`;
-
-        box.querySelectorAll('.btn-salvar-opcao').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const tr = btn.closest('tr');
-                const valor = tr.querySelector('.inp-valor').value.trim();
-                if (!valor) {
-                    alert('Informe um valor');
-                    return;
-                }
-                const res = await fetch('/api/admin/config/opcoes/' + tr.dataset.id, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ grupo: grupoAtual, valor }),
-                });
-                const data = await res.json();
-                if (!res.ok) alert(data.error || 'Erro');
-                else {
-                    statusMsg('Salvo.');
-                    await carregarOpcoes();
-                }
-            });
-        });
+        box.innerHTML = dados.map(o => `
+            <div class="config-item-row" data-id="${o.id}">
+                <span class="config-item-value">${escapar(o.valor)}</span>
+                <button type="button" class="btn-icon btn-remover-opcao" title="Remover">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 7h14M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            </div>
+        `).join('');
 
         box.querySelectorAll('.btn-remover-opcao').forEach(btn => {
             btn.addEventListener('click', async () => {
                 if (!confirm('Remover esta opção?')) return;
-                const id = btn.closest('tr').dataset.id;
+                const id = btn.closest('.config-item-row').dataset.id;
                 const res = await fetch(
                     '/api/admin/config/opcoes/' + id + '?grupo=' + encodeURIComponent(grupoAtual),
                     { method: 'DELETE' }
@@ -85,7 +65,7 @@ async function carregarOpcoes() {
             });
         });
     } catch (e) {
-        box.innerHTML = `<p class="form-erro">Erro: ${esc(e.message)}</p>`;
+        box.innerHTML = `<p class="hint" style="padding:16px 18px;margin:0;">Erro: ${esc(e.message)}</p>`;
     }
 }
 
@@ -123,6 +103,6 @@ function esc(s) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 }
-function escAttr(s) {
+function escapar(s) {
     return esc(s).replace(/"/g, '&quot;');
 }

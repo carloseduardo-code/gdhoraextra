@@ -7,3 +7,4 @@ data/app.db
 venv/
 .idea/
 .vscode/
+.claude/

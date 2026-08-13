@@ -1,7 +1,7 @@
 import os
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from io import BytesIO
 import base64
@@ -310,10 +310,20 @@ def carregar_formulario_config():
     }
 
 
+def contar_efetivo():
+    if supabase is None:
+        return 0
+    try:
+        res = supabase.table("funcionarios").select("matricula", count="exact").execute()
+        return int(getattr(res, "count", None) or len(res.data or []))
+    except Exception:
+        return 0
+
+
 # ------------------- ÁREA PÚBLICA -------------------
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", efetivo_total=contar_efetivo())
 
 
 @app.route("/solicitacao")
@@ -366,10 +376,189 @@ def admin_logout():
     return redirect(url_for("index"))
 
 
+DIAS_PT = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+MESES_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
+TURNO_CSS = {"Dia": "t-dia", "Noite": "t-noite", "Extensão de Horário": "t-ext"}
+
+
+def turno_css(turno):
+    return TURNO_CSS.get(turno, "t-dia")
+
+
+def _parse_dt(valor):
+    if not valor:
+        return None
+    try:
+        s = str(valor).replace("Z", "+00:00")
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is not None:
+            dt = dt.replace(tzinfo=None)
+        return dt
+    except Exception:
+        return None
+
+
+def calcular_metricas_dashboard():
+    vazio = {
+        "metrics": [
+            {"label": "Solicitações hoje", "value": 0, "delta": "", "delta_dir": "", "hint": ""},
+            {"label": "Esta semana", "value": 0, "delta": "", "delta_dir": "", "hint": ""},
+            {"label": "Colaboradores solicitados", "value": 0, "delta": "", "delta_dir": "", "hint": "soma da semana"},
+            {"label": "Equipamentos vinculados", "value": 0, "delta": "", "delta_dir": "", "hint": "solicitações da semana"},
+        ],
+        "dias": [{"label": DIAS_PT[(datetime.now().date() - timedelta(days=i)).weekday()], "value": 0, "altura": 20, "atual": i == 0} for i in range(6, -1, -1)],
+        "top_funcoes": [],
+        "turno_split": [],
+        "recentes": [],
+        "total_solicitacoes": 0,
+    }
+    if supabase is None:
+        return vazio
+
+    try:
+        res = (
+            supabase.table("solicitacoes")
+            .select("*, solicitacao_itens(*)")
+            .order("criado_em", desc=True)
+            .execute()
+        )
+        dados = res.data or []
+    except Exception:
+        return vazio
+
+    agora = datetime.now()
+    hoje = agora.date()
+    ontem = hoje - timedelta(days=1)
+    inicio_semana = agora - timedelta(days=7)
+    inicio_semana_anterior = agora - timedelta(days=14)
+
+    hoje_count = ontem_count = semana_count = semana_anterior_count = 0
+    colaboradores_semana = equipamentos_semana = 0
+    contagem_dias = {}
+    funcao_totais = {}
+    turno_totais = {}
+
+    for sol in dados:
+        dt = _parse_dt(sol.get("criado_em"))
+        if dt is None:
+            continue
+        if dt.date() == hoje:
+            hoje_count += 1
+        if dt.date() == ontem:
+            ontem_count += 1
+        na_semana = dt >= inicio_semana
+        if na_semana:
+            semana_count += 1
+        elif dt >= inicio_semana_anterior:
+            semana_anterior_count += 1
+
+        itens = sol.get("solicitacao_itens") or []
+        equip_nome = (sol.get("equipamento") or "").strip()
+
+        if na_semana:
+            colaboradores_semana += sum(len(it.get("colaboradores") or []) for it in itens)
+            if equip_nome:
+                equipamentos_semana += 1
+
+        dia_key = dt.date().isoformat()
+        contagem_dias[dia_key] = contagem_dias.get(dia_key, 0) + 1
+
+        turno = sol.get("turno") or "Dia"
+        turno_totais[turno] = turno_totais.get(turno, 0) + 1
+
+        for it in itens:
+            funcao = (it.get("funcao") or "").strip()
+            if not funcao or (equip_nome and funcao.upper() == equip_nome.upper()):
+                continue
+            qtd = len(it.get("colaboradores") or []) or int(it.get("quantidade") or 0)
+            funcao_totais[funcao] = funcao_totais.get(funcao, 0) + qtd
+
+    dias = []
+    valores_semana = []
+    for i in range(6, -1, -1):
+        d = hoje - timedelta(days=i)
+        valores_semana.append(contagem_dias.get(d.isoformat(), 0))
+    max_dia = max(valores_semana) or 1
+    for i, i_dias_atras in enumerate(range(6, -1, -1)):
+        d = hoje - timedelta(days=i_dias_atras)
+        v = valores_semana[i]
+        dias.append({
+            "label": DIAS_PT[d.weekday()],
+            "value": v,
+            "altura": round(20 + (v / max_dia) * 96) if max_dia else 20,
+            "atual": i_dias_atras == 0,
+        })
+
+    top_funcoes_lista = sorted(funcao_totais.items(), key=lambda kv: kv[1], reverse=True)[:5]
+    max_funcao = (top_funcoes_lista[0][1] if top_funcoes_lista else 0) or 1
+    top_funcoes = [
+        {"label": k, "value": v, "pct": round(v / max_funcao * 100), "top": i == 0}
+        for i, (k, v) in enumerate(top_funcoes_lista)
+    ]
+
+    turno_total = sum(turno_totais.values()) or 1
+    turno_split = [
+        {"label": t, "value": turno_totais.get(t, 0), "pct": round(turno_totais.get(t, 0) / turno_total * 100), "css": turno_css(t)}
+        for t in ("Dia", "Noite", "Extensão de Horário")
+        if turno_totais.get(t, 0) > 0
+    ]
+
+    def _delta_abs(atual, anterior):
+        diff = atual - anterior
+        if diff == 0:
+            return "", ""
+        return (f"+{diff}" if diff > 0 else str(diff)), ("up" if diff > 0 else "down")
+
+    def _delta_pct(atual, anterior):
+        if anterior <= 0:
+            return "", ""
+        pct = round((atual - anterior) / anterior * 100)
+        if pct == 0:
+            return "", ""
+        return (f"+{pct}%" if pct > 0 else f"{pct}%"), ("up" if pct > 0 else "down")
+
+    hoje_delta, hoje_dir = _delta_abs(hoje_count, ontem_count)
+    semana_delta, semana_dir = _delta_pct(semana_count, semana_anterior_count)
+
+    metrics = [
+        {"label": "Solicitações hoje", "value": hoje_count, "delta": hoje_delta, "delta_dir": hoje_dir, "hint": f"vs. {ontem_count} ontem"},
+        {"label": "Esta semana", "value": semana_count, "delta": semana_delta, "delta_dir": semana_dir, "hint": f"vs. {semana_anterior_count} na anterior"},
+        {"label": "Colaboradores solicitados", "value": colaboradores_semana, "delta": "", "delta_dir": "", "hint": "soma da semana"},
+        {"label": "Equipamentos vinculados", "value": equipamentos_semana, "delta": "", "delta_dir": "", "hint": "solicitações da semana"},
+    ]
+
+    recentes = []
+    for sol in dados[:4]:
+        itens = sol.get("solicitacao_itens") or []
+        qtd = sum(len(it.get("colaboradores") or []) for it in itens)
+        data_iso = sol.get("data_solicitacao") or ""
+        partes = str(data_iso).split("-")
+        turno = sol.get("turno") or "Dia"
+        recentes.append({
+            "dia": partes[2] if len(partes) == 3 else "—",
+            "mes": MESES_PT[int(partes[1]) - 1] if len(partes) == 3 else "",
+            "titulo": sol.get("equipamento") or sol.get("as_code") or "—",
+            "solicitante": sol.get("solicitante") or "—",
+            "setor": sol.get("setor_solicitante") or sol.get("setor") or "—",
+            "qtd": qtd,
+            "turno": turno,
+            "turno_css": turno_css(turno),
+        })
+
+    return {
+        "metrics": metrics,
+        "dias": dias,
+        "top_funcoes": top_funcoes,
+        "turno_split": turno_split,
+        "recentes": recentes,
+        "total_solicitacoes": len(dados),
+    }
+
+
 @app.route("/admin")
 @admin_required
 def admin_home():
-    return render_template("admin/index.html", user=usuario_logado())
+    return render_template("admin/index.html", user=usuario_logado(), dash=calcular_metricas_dashboard())
 
 
 @app.route("/admin/solicitacoes")
@@ -441,13 +630,102 @@ def admin_usuarios():
     )
 
 
+AUDIT_ICON_META = {
+    "login": {"path": "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3", "bg": "#F2F4F7", "fg": "#475467"},
+    "logout": {"path": "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9", "bg": "#F2F4F7", "fg": "#475467"},
+    "remover": {"path": "M5 7h14M10 11v6M14 11v6M6 7l1 12h10L18 7M9 7V4h6v3", "bg": "#FEF3F2", "fg": "#B42318"},
+    "criar": {"path": "M12 5v14M5 12h14", "bg": "#EAF3EE", "fg": "#165F3F"},
+    "editar": {"path": "M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z", "bg": "#EAF3EE", "fg": "#165F3F"},
+    "aprovar": {"path": "M20 6 9 17l-5-5", "bg": "#EAF3EE", "fg": "#165F3F"},
+    "cadastro": {"path": "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M11 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0M20 8v6M23 11h-6", "bg": "#EAF3EE", "fg": "#165F3F"},
+    "importar": {"path": "M12 15V3M7 8l5-5 5 5M4 21h16", "bg": "#FFFBF2", "fg": "#B45309"},
+}
+DEFAULT_AUDIT_ICON = {"path": "M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z", "bg": "#F2F4F7", "fg": "#475467"}
+
+
+def _detalhes_dict(raw):
+    if not raw:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    try:
+        return json.loads(raw)
+    except Exception:
+        return {}
+
+
+def frase_auditoria(log):
+    acao = log.get("acao") or ""
+    entidade = log.get("entidade") or ""
+    eid = log.get("entidade_id")
+    det = _detalhes_dict(log.get("detalhes"))
+
+    if entidade == "usuario" and acao == "login":
+        return "entrou na área administrativa"
+    if entidade == "usuario" and acao == "logout":
+        return "saiu da área administrativa"
+    if entidade == "solicitacao" and acao == "criar":
+        return f"criou a solicitação #{eid}" if eid else "criou uma solicitação"
+    if entidade == "solicitacao" and acao == "remover":
+        return f"apagou a solicitação #{eid}" if eid else "apagou uma solicitação"
+    if entidade == "efetivo" and acao == "importar":
+        total = det.get("total")
+        return f"importou planilha com {total} colaboradores" if total else "importou uma planilha de efetivo"
+    if entidade == "config_opcao":
+        grupo = det.get("grupo") or ""
+        if acao == "criar":
+            return f"adicionou \"{det.get('valor', '')}\" em {grupo}".strip()
+        if acao == "editar":
+            return f"editou uma opção em {grupo}".strip()
+        if acao == "remover":
+            return f"removeu \"{det.get('valor', '')}\" de {grupo}".strip()
+    if entidade == "usuario" and acao == "cadastro":
+        return f"cadastrou o usuário {det.get('usuario', '')}".strip()
+    if entidade == "usuario" and acao == "aprovar":
+        return "aprovou um novo acesso"
+    return f"{acao} · {entidade}" + (f" #{eid}" if eid else "")
+
+
+def formatar_data_hora_br(valor):
+    dt = _parse_dt(valor)
+    if not dt:
+        return str(valor or "")
+    return dt.strftime("%d/%m %H:%M")
+
+
+def preparar_logs_auditoria(logs):
+    preparados = []
+    for log in logs:
+        det = _detalhes_dict(log.get("detalhes"))
+        det_fmt = json.dumps(det, indent=2, ensure_ascii=False) if det else ""
+        meta = AUDIT_ICON_META.get(log.get("acao"), DEFAULT_AUDIT_ICON)
+        preparados.append({
+            "usuario": log.get("usuario_nome") or "desconhecido",
+            "frase": frase_auditoria(log),
+            "quando": formatar_data_hora_br(log.get("criado_em")),
+            "detalhes": det_fmt,
+            "has_det": bool(det_fmt),
+            "icon": meta["path"],
+            "icon_bg": meta["bg"],
+            "icon_fg": meta["fg"],
+            "busca": " ".join([
+                str(log.get("usuario_nome") or ""),
+                str(log.get("acao") or ""),
+                str(log.get("entidade") or ""),
+                str(log.get("entidade_id") or ""),
+                det_fmt,
+            ]).lower(),
+        })
+    return preparados
+
+
 @app.route("/admin/auditoria")
 @admin_required
 def admin_auditoria():
     return render_template(
         "admin/auditoria.html",
         user=usuario_logado(),
-        logs=auth_db.listar_auditoria(limit=200),
+        logs=preparar_logs_auditoria(auth_db.listar_auditoria(limit=200)),
     )
 
 

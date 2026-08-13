@@ -1,6 +1,9 @@
 let debounce = null;
 let termoAtual = '';
 
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const TURNO_CSS = { 'Dia': 't-dia', 'Noite': 't-noite', 'Extensão de Horário': 't-ext' };
+
 document.addEventListener('DOMContentLoaded', () => {
     carregar('');
     const busca = document.getElementById('busca');
@@ -8,52 +11,139 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(debounce);
         debounce = setTimeout(() => carregar(busca.value.trim()), 250);
     });
-    document.getElementById('btn-exportar').addEventListener('click', exportar);
+    document.getElementById('btn-exportar').addEventListener('click', exportarExcel);
 });
 
 async function carregar(q) {
     termoAtual = q || '';
     const box = document.getElementById('lista-solicitacoes');
-    box.innerHTML = '<p>Carregando...</p>';
+    const countLabel = document.getElementById('sol-count-label');
+    box.innerHTML = '<p class="hint">Carregando...</p>';
     try {
         const res = await fetch('/api/admin/solicitacoes?q=' + encodeURIComponent(termoAtual));
         const dados = await res.json();
         if (!res.ok) throw new Error(dados.error || 'Erro');
+
+        if (countLabel) countLabel.textContent = `${dados.length} registro${dados.length === 1 ? '' : 's'}`;
+
         if (!dados.length) {
-            box.innerHTML = '<p>Nenhuma solicitação encontrada.</p>';
+            box.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-title">Nenhuma solicitação encontrada</div>
+                    <div class="empty-state-hint">Ajuste a busca para ver outros resultados.</div>
+                </div>`;
             return;
         }
-        box.innerHTML = '';
-        dados.forEach(sol => {
-            const card = document.createElement('div');
-            card.className = 'sol-card';
-            const resumo = sol.resumo_admin || montarResumoAdmin(sol);
-            const detalhesId = 'det-' + sol.id;
-            card.innerHTML = `
-                <pre class="resumo-admin">${escapar(resumo)}</pre>
-                <div class="sol-meta">
-                    <span>${escapar(sol.solicitante || '—')}</span>
-                    <span>${escapar(sol.setor_solicitante || sol.setor || '')}</span>
-                    <span>${escapar(sol.turno || '')}</span>
-                </div>
-                <div class="sol-acoes">
-                    <button type="button" class="btn-secondary btn-detalhe" data-target="${detalhesId}">Ver detalhes</button>
-                    <button type="button" class="btn-danger btn-apagar" data-id="${sol.id}">Apagar</button>
-                </div>
-                <div id="${detalhesId}" class="sol-detalhe" hidden></div>
-            `;
-            const detalhe = card.querySelector('.sol-detalhe');
-            detalhe.innerHTML = montarDetalhe(sol);
-            card.querySelector('.btn-detalhe').addEventListener('click', (ev) => {
-                const el = document.getElementById(ev.target.dataset.target);
-                el.hidden = !el.hidden;
-                ev.target.textContent = el.hidden ? 'Ver detalhes' : 'Ocultar detalhes';
+        box.innerHTML = dados.map(criarLinha).join('');
+
+        box.querySelectorAll('.sol-row').forEach(row => {
+            const id = row.dataset.id;
+            const toggle = row.querySelector('.sol-toggle');
+            const body = row.querySelector('.sol-row-body');
+            toggle.addEventListener('click', () => {
+                const abrir = body.hidden;
+                body.hidden = !abrir;
+                toggle.classList.toggle('open', abrir);
             });
-            card.querySelector('.btn-apagar').addEventListener('click', () => apagarSolicitacao(sol.id));
-            box.appendChild(card);
+            row.querySelector('.btn-copiar-texto')?.addEventListener('click', () => copiarTexto(row.dataset.texto || ''));
+            row.querySelector('.btn-apagar')?.addEventListener('click', () => apagarSolicitacao(id));
         });
     } catch (e) {
-        box.innerHTML = `<p>Erro: ${escapar(e.message)}</p>`;
+        box.innerHTML = `<p class="hint">Erro: ${escapar(e.message)}</p>`;
+    }
+}
+
+function criarLinha(sol) {
+    const itens = sol.solicitacao_itens || [];
+    const turno = sol.turno || 'Dia';
+    const turnoCss = TURNO_CSS[turno] || 't-dia';
+    const qtd = itens.reduce((a, i) => a + (i.colaboradores || []).length, 0);
+    const partes = String(sol.data_solicitacao || '').split('-');
+    const dia = partes.length === 3 ? partes[2] : '—';
+    const mes = partes.length === 3 ? MESES[Number(partes[1]) - 1] : '';
+    const setor = sol.setor_solicitante || sol.setor || '—';
+    const equipamento = sol.equipamento || '';
+    const asCode = sol.as_code || '';
+    const referencia = equipamento || (asCode.includes(' - ') ? asCode.split(' - ')[0] : asCode) || '—';
+    const titulo = `HE ${formatarData(sol.data_solicitacao)} · ${referencia}`;
+    const resumo = sol.resumo_texto || montarResumoAdmin(sol);
+
+    const funcoesHtml = itens.length
+        ? itens.map(item => `
+            <div class="sol-func-item">
+                <div class="sol-func-head">
+                    <span class="funcao">${escapar((item.funcao || '').toUpperCase())}</span>
+                    <span class="qtd">${(item.colaboradores || []).length}</span>
+                </div>
+                <div class="sol-func-colabs">
+                    ${(item.colaboradores || []).map(c => `<span>${escapar(formatarColaborador(c))}</span>`).join('') || '<span>—</span>'}
+                </div>
+            </div>
+        `).join('')
+        : '<p class="hint" style="margin-top:12px;">Nenhum item.</p>';
+
+    const detalhesHtml = [
+        ['Solicitante', sol.solicitante || '—'],
+        ['Setor', setor],
+        ['AS', asCode || '—'],
+        ['Equipamento', equipamento || '—'],
+        ['Data', formatarData(sol.data_solicitacao)],
+        ['Turno', turno],
+    ].map(([label, value]) => `
+        <div class="row"><dt>${escapar(label)}</dt><dd>${escapar(value)}</dd></div>
+    `).join('');
+
+    return `
+        <div class="sol-row" data-id="${sol.id}" data-texto="${escAttr(resumo)}">
+            <div class="sol-row-head">
+                <div class="sol-date-chip"><span class="dia">${escapar(dia)}</span><span class="mes">${escapar(mes)}</span></div>
+                <div class="sol-row-title">
+                    <div class="titulo">${escapar(titulo)}</div>
+                    <div class="sol-row-meta">
+                        <span>${escapar(sol.solicitante || '—')}</span><span class="sep">·</span><span>${escapar(setor)}</span><span class="sep">·</span><span>${escapar(asCode || '—')}</span>
+                    </div>
+                </div>
+                <div class="sol-row-side">
+                    <span class="chip-badge turno ${turnoCss}">${escapar(turno)}</span>
+                    <span class="chip-count">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="9.5" cy="7" r="3.5"></circle><path d="M21 20v-2a4 4 0 0 0-3-3.87"></path></svg>${qtd}
+                    </span>
+                    <button type="button" class="sol-toggle" title="Detalhes">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="sol-row-body" hidden>
+                <div class="sol-row-grid">
+                    <div class="sol-row-panel">
+                        <div class="sol-row-panel-title">Funções</div>
+                        ${funcoesHtml}
+                    </div>
+                    <div class="sol-row-panel">
+                        <div class="sol-row-panel-title">Detalhes</div>
+                        <dl class="sol-detalhe-list">${detalhesHtml}</dl>
+                    </div>
+                </div>
+                <div class="sol-row-actions">
+                    <button type="button" class="btn-secondary btn-copiar-texto">Copiar texto</button>
+                    <button type="button" class="btn-danger btn-apagar">Apagar</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function formatarColaborador(c) {
+    if (typeof c === 'string') return c;
+    if (c.a_procura) return `${c.matricula || '01'} - ${c.descricao || c.nome} (À procura...)`;
+    return `${c.matricula || ''} - ${c.nome || ''}`.trim();
+}
+
+async function copiarTexto(texto) {
+    try {
+        await navigator.clipboard.writeText(texto);
+    } catch {
+        /* silencioso: clipboard indisponível */
     }
 }
 
@@ -83,32 +173,6 @@ function montarResumoAdmin(sol) {
     return t;
 }
 
-function montarDetalhe(sol) {
-    let html = `<p><strong>Solicitante:</strong> ${escapar(sol.solicitante || '—')}<br>
-        <strong>Setor:</strong> ${escapar(sol.setor_solicitante || sol.setor || '—')}<br>
-        <strong>Equipamento:</strong> ${escapar(sol.equipamento || '—')}<br>
-        <strong>AS:</strong> ${escapar(sol.as_code || '—')}<br>
-        <strong>Data:</strong> ${escapar(formatarData(sol.data_solicitacao))}<br>
-        <strong>Turno:</strong> ${escapar(sol.turno || '—')}</p>`;
-    (sol.solicitacao_itens || []).forEach(item => {
-        html += `<h3>${escapar(item.funcao)} (${item.quantidade})</h3><ul>`;
-        (item.colaboradores || []).forEach(c => {
-            if (typeof c === 'string') {
-                html += `<li>${escapar(c)}</li>`;
-            } else if (c.a_procura) {
-                html += `<li>${escapar(c.matricula || '01')} - ${escapar(c.descricao || c.nome)} (À procura...)</li>`;
-            } else {
-                html += `<li>${escapar(c.matricula || '')} - ${escapar(c.nome || '')}</li>`;
-            }
-        });
-        html += '</ul>';
-    });
-    if (sol.resumo_texto) {
-        html += `<details><summary>Texto completo (WhatsApp)</summary><pre class="resumo-box">${escapar(sol.resumo_texto)}</pre></details>`;
-    }
-    return html;
-}
-
 function formatarData(iso) {
     if (!iso) return '';
     const p = String(iso).split('-');
@@ -123,20 +187,6 @@ function escapar(s) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
 }
-
-async function exportar() {
-    try {
-        const res = await fetch('/api/admin/exportar');
-        const data = await res.json();
-        if (!res.ok || !data.excel_base64) {
-            alert(data.error || 'Erro ao exportar');
-            return;
-        }
-        const link = document.createElement('a');
-        link.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + data.excel_base64;
-        link.download = data.filename || 'solicitacoes.xlsx';
-        link.click();
-    } catch {
-        alert('Erro na exportação.');
-    }
+function escAttr(s) {
+    return escapar(s).replace(/'/g, '&#39;');
 }

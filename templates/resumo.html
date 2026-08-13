@@ -1,11 +1,8 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resumo da Solicitação</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% set page_title = "Solicitação enviada" %}
+{% include "_head.html" %}
 </head>
 <body>
 <div class="container">
@@ -20,11 +17,20 @@
         <a href="{{ url_for('index') }}" class="btn-nav">Início</a>
     </div>
 
-    <pre id="resumo-texto" class="resumo-box">Carregando...</pre>
+    <div class="resumo-block">
+        <div class="resumo-block-head">
+            <span class="resumo-panel-label">Resumo</span>
+            <button type="button" class="btn-copiar" id="btn-copiar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"></rect><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3H6.5A2.5 2.5 0 0 0 4 5.5v6A2.5 2.5 0 0 0 6.5 14"></path></svg>
+                <span id="btn-copiar-label">Copiar</span>
+            </button>
+        </div>
+        <pre id="resumo-texto">Carregando...</pre>
+    </div>
 
     <div class="acoes-resumo">
-        <button type="button" class="btn-primary" id="btn-copiar">Copiar Solicitação</button>
-        <a href="{{ url_for('solicitacao') }}" class="btn-secondary" style="text-align:center; text-decoration:none; display:block; margin-top:10px;">Nova solicitação</a>
+        <a href="{{ url_for('solicitacao') }}" class="btn-primary">Nova solicitação</a>
+        <a href="{{ url_for('index') }}" class="btn-secondary" style="text-align:center;">Início</a>
     </div>
     <p id="copiar-status" class="status-inline"></p>
 </div>
@@ -47,9 +53,9 @@ async function carregar() {
 document.getElementById('btn-copiar').addEventListener('click', async () => {
     const texto = document.getElementById('resumo-texto').textContent;
     const status = document.getElementById('copiar-status');
+    const label = document.getElementById('btn-copiar-label');
     try {
         await navigator.clipboard.writeText(texto);
-        status.textContent = 'Copiado!';
     } catch {
         const range = document.createRange();
         range.selectNodeContents(document.getElementById('resumo-texto'));
@@ -57,8 +63,10 @@ document.getElementById('btn-copiar').addEventListener('click', async () => {
         sel.removeAllRanges();
         sel.addRange(range);
         document.execCommand('copy');
-        status.textContent = 'Copiado!';
     }
+    status.textContent = 'Copiado!';
+    label.textContent = 'Copiado';
+    setTimeout(() => { label.textContent = 'Copiar'; }, 1800);
 });
 
 carregar();

@@ -6,6 +6,7 @@ let previaDebounce = null;
 const CAMPOS_SKIP = new Set(['equipamento', 'funcoes']); // equipamento vai para seção própria
 
 const TOTAL_ETAPAS = 4;
+const STEP_NAMES = ['Dados', 'Funções', 'Equipamentos', 'Revisão'];
 let etapaAtual = 1;
 let maiorEtapaAlcancada = 1;
 
@@ -75,6 +76,13 @@ function mostrarEtapa(n, opts) {
     document.getElementById('btn-voltar').hidden = n === 1;
     document.getElementById('btn-proximo').hidden = n === TOTAL_ETAPAS;
     document.getElementById('btn-enviar').hidden = n !== TOTAL_ETAPAS;
+
+    const brandStep = document.getElementById('wizard-brand-step');
+    if (brandStep) brandStep.textContent = `Etapa ${n} de ${TOTAL_ETAPAS} · ${STEP_NAMES[n - 1]}`;
+    const progressFill = document.getElementById('wizard-progress-fill');
+    if (progressFill) progressFill.style.width = `${(n / TOTAL_ETAPAS) * 100}%`;
+    const navHint = document.getElementById('wizard-nav-hint');
+    if (navHint) navHint.textContent = n === TOTAL_ETAPAS ? 'Revise antes de enviar' : `Etapa ${n} de ${TOTAL_ETAPAS}`;
 
     if (n === TOTAL_ETAPAS) atualizarResumoPrevia();
 
@@ -463,6 +471,9 @@ function adicionarBloco() {
     const container = document.getElementById('blocos-container');
     const bloco = clone.querySelector('.bloco-funcao');
 
+    const badge = bloco.querySelector('.bloco-item-badge');
+    if (badge) badge.textContent = `Função ${container.querySelectorAll('.bloco-funcao').length + 1}`;
+
     const select = bloco.querySelector('.funcao-select');
     const qtdInput = bloco.querySelector('.quantidade-input');
     const divColab = bloco.querySelector('.colaboradores-container');
@@ -549,6 +560,8 @@ function filtrarColaboradoresBloco(container, q) {
 function atualizarQuantidade(container, qtdInput) {
     const checked = container.querySelectorAll('input[type="checkbox"]:checked').length;
     qtdInput.value = checked;
+    const badge = container.closest('.bloco-funcao')?.querySelector('.bloco-item-count');
+    if (badge) badge.textContent = checked;
 }
 
 /* ---------- Equipamentos ---------- */
@@ -569,6 +582,9 @@ function adicionarBlocoEquipamento() {
     const clone = template.content.cloneNode(true);
     const container = document.getElementById('equipamentos-container');
     const bloco = clone.querySelector('.bloco-equipamento');
+
+    const badge = bloco.querySelector('.bloco-item-badge');
+    if (badge) badge.textContent = `Equipamento ${container.querySelectorAll('.bloco-equipamento').length + 1}`;
 
     const selectEq = bloco.querySelector('.equipamento-select');
     popularSelectEquipamento(selectEq);

@@ -1,48 +1,140 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Hora Extra</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-<div class="container home-container">
-    <header class="home-header">
-        <div>
-            <h1>Administração</h1>
-            <p class="home-subtitle">Olá, {{ user.nome }}</p>
-        </div>
-        <a href="{{ url_for('admin_logout') }}" class="btn-nav">Sair</a>
-    </header>
+{% extends "admin/base.html" %}
+{% set page_title = "Admin - Hora Extra" %}
 
-    <nav class="menu-grid" aria-label="Menu administrativo">
-        <a href="{{ url_for('admin_solicitacoes') }}" class="menu-card">
-            <span class="menu-card-title">Solicitações</span>
-            <span class="menu-card-desc">Ver, exportar e apagar solicitações</span>
-        </a>
-        <a href="{{ url_for('admin_efetivo') }}" class="menu-card">
-            <span class="menu-card-title">Efetivo</span>
-            <span class="menu-card-desc">Consultar e importar planilha de colaboradores</span>
-        </a>
-        <a href="{{ url_for('admin_config') }}" class="menu-card">
-            <span class="menu-card-title">Configuração</span>
-            <span class="menu-card-desc">Equipamentos, setores e áreas de serviço (AS)</span>
-        </a>
-        <a href="{{ url_for('admin_usuarios') }}" class="menu-card">
-            <span class="menu-card-title">Usuários</span>
-            <span class="menu-card-desc">Cadastrar quem pode acessar a área admin</span>
-        </a>
-        <a href="{{ url_for('admin_auditoria') }}" class="menu-card">
-            <span class="menu-card-title">Auditoria</span>
-            <span class="menu-card-desc">Ver quem removeu ou alterou registros</span>
-        </a>
-    </nav>
-
-    <p class="home-admin-link">
-        <a href="{{ url_for('index') }}">Área pública</a>
-    </p>
+{% block content %}
+<div class="page-title-row">
+    <div>
+        <h1>Visão geral</h1>
+        <p>Solicitações recebidas nos últimos 7 dias.</p>
+    </div>
+    <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-secondary" onclick="exportarExcel()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 5 5-5M4 21h16"></path></svg>
+            Exportar Excel
+        </button>
+        <a href="{{ url_for('admin_solicitacoes') }}" class="btn-primary" style="min-height:38px;padding:0 15px;font-size:13px;">Ver solicitações</a>
+    </div>
 </div>
-</body>
-</html>
+
+<div class="stat-grid">
+    {% for m in dash.metrics %}
+    <div class="stat-tile">
+        <div class="stat-tile-label">{{ m.label }}</div>
+        <div class="stat-tile-row">
+            <span class="stat-tile-value">{{ m.value }}</span>
+            {% if m.delta %}<span class="stat-tile-delta {{ m.delta_dir }}">{{ m.delta }}</span>{% endif %}
+        </div>
+        <div class="stat-tile-hint">{{ m.hint }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="dash-grid">
+    <div class="dash-card">
+        <div class="dash-card-head">
+            <h2>Solicitações por dia</h2>
+            <span class="tag">7 dias</span>
+        </div>
+        <div class="bar-chart">
+            {% for d in dash.dias %}
+            <div class="bar-chart-col">
+                <span class="bar-chart-value">{{ d.value }}</span>
+                <div class="bar-chart-bar{{ ' current' if d.atual else '' }}" style="height:{{ d.altura }}px;"></div>
+                <span class="bar-chart-label">{{ d.label }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="dash-card">
+        <h2>Funções mais solicitadas</h2>
+        <div class="bar-list">
+            {% for f in dash.top_funcoes %}
+            <div>
+                <div class="bar-list-row-top">
+                    <span class="label">{{ f.label }}</span>
+                    <span class="value">{{ f.value }}</span>
+                </div>
+                <div class="bar-list-track">
+                    <div class="bar-list-fill{{ ' top' if f.top else '' }}" style="width:{{ f.pct }}%;"></div>
+                </div>
+            </div>
+            {% else %}
+            <p class="hint" style="margin:0;">Sem dados suficientes ainda.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="dash-grid">
+    <div class="dash-card" style="padding:0;">
+        <div class="dash-card-head" style="padding:18px 20px;">
+            <h2>Últimas solicitações</h2>
+            <a href="{{ url_for('admin_solicitacoes') }}" style="font-size:12.5px;font-weight:600;">Ver todas</a>
+        </div>
+        <div>
+            {% for r in dash.recentes %}
+            <div class="recent-list-row">
+                <div class="recent-list-date">
+                    <span class="dia">{{ r.dia }}</span>
+                    <span class="mes">{{ r.mes }}</span>
+                </div>
+                <div class="recent-list-info">
+                    <div class="recent-list-title">{{ r.titulo }}</div>
+                    <div class="recent-list-meta">{{ r.solicitante }} · {{ r.setor }} · {{ r.qtd }} colaboradores</div>
+                </div>
+                <span class="chip-badge turno {{ r.turno_css }}">{{ r.turno }}</span>
+            </div>
+            {% else %}
+            <div class="empty-state" style="border:none;box-shadow:none;">
+                <div class="empty-state-title">Nenhuma solicitação ainda</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="dash-card-flat">
+        <div class="dash-card">
+            <h2 style="margin-bottom:16px;">Distribuição por turno</h2>
+            <div class="turno-split-track">
+                {% for t in dash.turno_split %}
+                <div class="turno-seg {{ t.css }}" style="width:{{ t.pct }}%;"></div>
+                {% endfor %}
+            </div>
+            <div class="turno-split-legend">
+                {% for t in dash.turno_split %}
+                <div class="turno-split-legend-item">
+                    <span class="dot turno-dot {{ t.css }}"></span>
+                    <span>{{ t.label }}</span>
+                    <span class="value">{{ t.value }}</span>
+                </div>
+                {% else %}
+                <p class="hint" style="margin:0;">Sem solicitações registradas ainda.</p>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="quick-links">
+            <a href="{{ url_for('admin_efetivo') }}" class="quick-link">
+                <div class="quick-link-title">Efetivo</div>
+                <div class="quick-link-desc">Consultar e importar planilha</div>
+            </a>
+            <a href="{{ url_for('admin_config') }}" class="quick-link">
+                <div class="quick-link-title">Configuração</div>
+                <div class="quick-link-desc">Equipamentos, setores e AS</div>
+            </a>
+            <a href="{{ url_for('admin_usuarios') }}" class="quick-link">
+                <div class="quick-link-title">Usuários</div>
+                <div class="quick-link-desc">Acessos da área admin</div>
+            </a>
+            <a href="{{ url_for('admin_auditoria') }}" class="quick-link">
+                <div class="quick-link-title">Auditoria</div>
+                <div class="quick-link-desc">Remoções e alterações</div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='admin_common.js') }}"></script>
+{% endblock %}

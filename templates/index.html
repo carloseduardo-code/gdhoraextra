@@ -1,29 +1,58 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hora Extra</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% set page_title = "Hora Extra" %}
+{% include "_head.html" %}
 </head>
 <body>
 <div class="container home-container">
-    <div class="page-header">
-        <div class="logo-brand">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="Gonçalves & Dias">
-            <div>
-                <h1>Hora Extra</h1>
-                <p class="home-subtitle">Área pública: solicitações de efetivo</p>
+    <div class="hero-shell">
+        <div class="hero-topbar">
+            <div class="hero-brand">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Gonçalves &amp; Dias">
+                <div class="hero-divider"></div>
+                <span class="hero-brand-name">Hora Extra</span>
+            </div>
+            <a href="{{ url_for('admin_login') }}" class="hero-admin-link">Acesso administrativo</a>
+        </div>
+
+        <div class="hero-main">
+            <div class="hero-inner">
+                <span class="badge-pill">Área pública</span>
+                <h1>Solicitação de hora extra</h1>
+                <p>Registre o pedido em quatro etapas. O resumo sai pronto para enviar à gestão.</p>
+
+                <div class="hero-card">
+                    <div class="hero-card-body">
+                        <div class="hero-card-top">
+                            <div class="hero-card-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v8M8 12h8"></path><rect x="3" y="3" width="18" height="18" rx="5"></rect></svg>
+                            </div>
+                            <div>
+                                <div class="hero-card-title">Nova solicitação</div>
+                                <div class="hero-card-desc">Dados, funções, equipamentos e revisão.</div>
+                            </div>
+                        </div>
+                        <a href="{{ url_for('solicitacao') }}" class="btn-primary btn-home-cta">Enviar solicitação</a>
+                    </div>
+                    <div class="hero-facts">
+                        <div>
+                            <div class="hero-fact-value">4</div>
+                            <div class="hero-fact-label">etapas</div>
+                        </div>
+                        <div>
+                            <div class="hero-fact-value">~2 min</div>
+                            <div class="hero-fact-label">para enviar</div>
+                        </div>
+                        <div>
+                            <div class="hero-fact-value">{{ efetivo_total }}</div>
+                            <div class="hero-fact-label">no efetivo</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-
-    <a href="{{ url_for('solicitacao') }}" class="btn-primary btn-home-cta">Enviar Solicitação</a>
-
-    <p class="home-admin-link">
-        <a href="{{ url_for('admin_login') }}">Acesso administrativo</a>
-    </p>
 </div>
 </body>
 </html>

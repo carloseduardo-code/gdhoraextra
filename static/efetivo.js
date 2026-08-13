@@ -9,6 +9,13 @@ document.addEventListener('DOMContentLoaded', () => {
         debounce = setTimeout(() => renderTabela(e.target.value.trim()), 200);
     });
 
+    document.getElementById('btn-importar-trigger')?.addEventListener('click', () => {
+        document.getElementById('arquivo-input').click();
+    });
+    document.getElementById('arquivo-input')?.addEventListener('change', () => {
+        document.getElementById('form-importar').requestSubmit();
+    });
+
     document.getElementById('form-importar').addEventListener('submit', async (e) => {
         e.preventDefault();
         const fileInput = document.getElementById('arquivo-input');
@@ -19,7 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const formData = new FormData();
         formData.append('arquivo', file);
-        const btn = document.getElementById('btn-importar');
+        const btn = document.getElementById('btn-importar-trigger') || document.getElementById('btn-importar');
+        const textoOriginal = btn.innerHTML;
         btn.disabled = true;
         btn.textContent = 'Importando...';
         try {
@@ -36,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
             exibirStatus('Erro: ' + err.message, 'erro');
         } finally {
             btn.disabled = false;
-            btn.textContent = 'Importar Planilha';
+            btn.innerHTML = textoOriginal;
         }
     });
 });
@@ -64,7 +72,8 @@ function renderTabela(q) {
         (r.nome || '').toLowerCase().includes(ql) ||
         (r.funcao || '').toLowerCase().includes(ql)
     );
-    totalSpan.textContent = `Total: ${filtrados.length}` + (ql ? ` (de ${todos.length})` : '');
+    const plural = filtrados.length === 1 ? 'colaborador' : 'colaboradores';
+    totalSpan.textContent = `${filtrados.length} ${plural}` + (ql ? ` de ${todos.length}` : '');
     if (!filtrados.length) {
         tbody.innerHTML = '<tr><td colspan="3">Nenhum colaborador encontrado.</td></tr>';
         return;

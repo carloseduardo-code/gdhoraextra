@@ -1,140 +1,178 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enviar Solicitação</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% set page_title = "Enviar Solicitação" %}
+{% include "_head.html" %}
 </head>
 <body>
-<div class="container form-page">
-    <div class="page-header">
-        <div class="logo-brand">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="Gonçalves & Dias">
-            <div>
-                <h1>Enviar solicitação</h1>
-                <p class="page-lead">Preencha os dados abaixo para solicitar hora extra ou efetivo.</p>
+<div class="container">
+    <div class="wizard-shell">
+        <div class="wizard-topbar">
+            <div class="wizard-topbar-row">
+                <div class="wizard-brand">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="">
+                    <div>
+                        <div class="wizard-brand-title">Enviar solicitação</div>
+                        <div class="wizard-brand-step" id="wizard-brand-step">Etapa 1 de 4 · Dados</div>
+                    </div>
+                </div>
+                <a href="{{ url_for('index') }}" class="btn-secondary" style="min-height:36px;padding:0 13px;font-size:13px;">Sair</a>
+            </div>
+            <div class="wizard-progress-track">
+                <div class="wizard-progress-fill" id="wizard-progress-fill" style="width:25%"></div>
             </div>
         </div>
-        <a href="{{ url_for('index') }}" class="btn-nav">Início</a>
+
+        <div class="wizard-body">
+            <ol class="wizard-steps" id="wizard-steps" aria-label="Etapas do formulário">
+                <li>
+                    <button type="button" class="wizard-step" data-step-indicator="1" data-step-name="Dados">
+                        <span class="wizard-step-line"></span>
+                        <span class="wizard-step-meta">
+                            <span class="wizard-step-num">1</span>
+                            <span class="wizard-step-label">Dados</span>
+                        </span>
+                    </button>
+                </li>
+                <li>
+                    <button type="button" class="wizard-step" data-step-indicator="2" data-step-name="Funções">
+                        <span class="wizard-step-line"></span>
+                        <span class="wizard-step-meta">
+                            <span class="wizard-step-num">2</span>
+                            <span class="wizard-step-label">Funções</span>
+                        </span>
+                    </button>
+                </li>
+                <li>
+                    <button type="button" class="wizard-step" data-step-indicator="3" data-step-name="Equipamentos">
+                        <span class="wizard-step-line"></span>
+                        <span class="wizard-step-meta">
+                            <span class="wizard-step-num">3</span>
+                            <span class="wizard-step-label">Equipamentos</span>
+                        </span>
+                    </button>
+                </li>
+                <li>
+                    <button type="button" class="wizard-step" data-step-indicator="4" data-step-name="Revisão">
+                        <span class="wizard-step-line"></span>
+                        <span class="wizard-step-meta">
+                            <span class="wizard-step-num">4</span>
+                            <span class="wizard-step-label">Revisão</span>
+                        </span>
+                    </button>
+                </li>
+            </ol>
+
+            <form id="solicitacao-form" novalidate>
+                <section class="form-card" id="card-dados" data-step="1">
+                    <div class="form-card-header">
+                        <div>
+                            <h2>Dados da solicitação</h2>
+                            <p>Informações básicas do pedido.</p>
+                        </div>
+                    </div>
+                    <div class="form-card-body campos-grid" id="campos-dinamicos"></div>
+                </section>
+
+                <section class="form-card" id="secao-funcoes" data-step="2">
+                    <div class="form-card-header">
+                        <div>
+                            <h2>Funções e colaboradores</h2>
+                            <p>Marque quem participa de cada função.</p>
+                        </div>
+                    </div>
+                    <div class="form-card-body">
+                        <div id="blocos-container" class="blocos-lista"></div>
+                        <button type="button" id="add-funcao" class="btn-add" style="margin-top:14px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+                            Adicionar outra função
+                        </button>
+                    </div>
+                </section>
+
+                <section class="form-card" id="secao-equipamentos" data-step="3">
+                    <div class="form-card-header">
+                        <div>
+                            <h2>Equipamentos</h2>
+                            <p>Opcional. Vincule o operador responsável.</p>
+                        </div>
+                    </div>
+                    <div class="form-card-body">
+                        <div id="equipamentos-container" class="blocos-lista"></div>
+                        <button type="button" id="add-equipamento" class="btn-add" style="margin-top:14px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+                            Adicionar equipamento
+                        </button>
+                    </div>
+                </section>
+
+                <section class="form-card" id="secao-observacao" data-step="3">
+                    <div class="form-card-header">
+                        <div>
+                            <h2>Observação</h2>
+                            <p>Comentário adicional para esta solicitação.</p>
+                        </div>
+                    </div>
+                    <div class="form-card-body">
+                        <textarea id="campo-observacao" name="observacao" rows="4" placeholder="Digite aqui sua observação…"></textarea>
+                    </div>
+                </section>
+
+                <section class="form-card" id="card-resumo-previa" data-step="4">
+                    <div class="form-card-header">
+                        <div>
+                            <h2>Revisão antes do envio</h2>
+                            <p>Confira os dados. Toque em qualquer etapa acima para corrigir.</p>
+                        </div>
+                    </div>
+                    <div class="form-card-body">
+                        <div id="resumo-previa" class="resumo-previa">Preencha o formulário para ver o resumo.</div>
+                    </div>
+                </section>
+
+                <div class="form-actions">
+                    <p id="form-erro" class="form-erro" hidden></p>
+                </div>
+            </form>
+        </div>
+
+        <div class="wizard-nav">
+            <div class="wizard-nav-row">
+                <button type="button" class="btn-secondary" id="btn-voltar" hidden>Voltar</button>
+                <div class="wizard-nav-hint" id="wizard-nav-hint">Etapa 1 de 4</div>
+                <button type="button" class="btn-primary btn-proximo" id="btn-proximo">
+                    Próximo
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"></path></svg>
+                </button>
+                <button type="submit" form="solicitacao-form" class="btn-primary btn-enviar" id="btn-enviar" hidden>Enviar solicitação</button>
+            </div>
+        </div>
     </div>
-
-    <ol class="wizard-steps" id="wizard-steps" aria-label="Etapas do formulário">
-        <li class="wizard-step" data-step-indicator="1">
-            <span class="wizard-step-num">1</span>
-            <span class="wizard-step-label">Dados</span>
-        </li>
-        <li class="wizard-step" data-step-indicator="2">
-            <span class="wizard-step-num">2</span>
-            <span class="wizard-step-label">Funções</span>
-        </li>
-        <li class="wizard-step" data-step-indicator="3">
-            <span class="wizard-step-num">3</span>
-            <span class="wizard-step-label">Equipamentos</span>
-        </li>
-        <li class="wizard-step" data-step-indicator="4">
-            <span class="wizard-step-num">4</span>
-            <span class="wizard-step-label">Revisão</span>
-        </li>
-    </ol>
-
-    <form id="solicitacao-form" novalidate>
-        <section class="form-card" id="card-dados" data-step="1">
-            <div class="form-card-header">
-                <div>
-                    <h2>Dados da solicitação</h2>
-                    <p>Informações básicas do pedido</p>
-                </div>
-            </div>
-            <div class="form-card-body" id="campos-dinamicos"></div>
-        </section>
-
-        <section class="form-card" id="secao-funcoes" data-step="2">
-            <div class="form-card-header">
-                <div>
-                    <h2>Funções e colaboradores</h2>
-                    <p>Selecione funções e marque os colaboradores necessários</p>
-                </div>
-            </div>
-            <div class="form-card-body">
-                <div id="blocos-container" class="blocos-lista"></div>
-                <button type="button" id="add-funcao" class="btn-add">+ Adicionar outra função</button>
-            </div>
-        </section>
-
-        <section class="form-card" id="secao-equipamentos" data-step="3">
-            <div class="form-card-header">
-                <div>
-                    <h2>Equipamentos</h2>
-                    <p>Vincule equipamentos e o operador responsável (opcional)</p>
-                </div>
-            </div>
-            <div class="form-card-body">
-                <div id="equipamentos-container" class="blocos-lista"></div>
-                <button type="button" id="add-equipamento" class="btn-add">+ Adicionar equipamento</button>
-            </div>
-        </section>
-
-        <section class="form-card form-card-notes" id="secao-observacao" data-step="3">
-            <div class="form-card-header">
-                <div>
-                    <h2>Observação</h2>
-                    <p>Registre um comentário adicional para esta solicitação.</p>
-                </div>
-            </div>
-            <div class="form-card-body">
-                <div class="form-group">
-                    <label for="campo-observacao">Observação</label>
-                    <textarea id="campo-observacao" name="observacao" rows="4" placeholder="Digite aqui sua observação..."></textarea>
-                </div>
-            </div>
-        </section>
-
-        <section class="form-card form-card-resumo" id="card-resumo-previa" data-step="4">
-            <div class="form-card-header">
-                <div>
-                    <h2>Revisão antes do envio</h2>
-                    <p>Confira todos os dados preenchidos. Você pode voltar a qualquer etapa para corrigir.</p>
-                </div>
-            </div>
-            <div class="form-card-body">
-                <div id="resumo-previa" class="resumo-previa">Preencha o formulário para ver o resumo.</div>
-            </div>
-        </section>
-
-        <div class="form-actions">
-            <p id="form-erro" class="form-erro" hidden></p>
-            <div class="wizard-nav">
-                <button type="button" class="btn-secondary" id="btn-voltar" hidden>← Voltar</button>
-                <button type="button" class="btn-primary btn-proximo" id="btn-proximo">Próximo →</button>
-                <button type="submit" class="btn-primary btn-enviar" id="btn-enviar" hidden>Enviar Solicitação</button>
-            </div>
-        </div>
-    </form>
 </div>
 
 <template id="bloco-template">
     <div class="bloco-item bloco-funcao">
         <div class="bloco-item-top">
             <span class="bloco-item-badge">Função</span>
-            <button type="button" class="btn-remover-bloco" title="Remover">×</button>
-        </div>
-        <div class="bloco-grid">
-            <div class="form-group">
-                <label>Função</label>
-                <select class="funcao-select" required aria-label="Função">
-                    <option value="">Selecione a Função</option>
-                </select>
-            </div>
-            <div class="form-group form-group-qtd">
-                <label>Quantidade</label>
-                <input type="number" class="quantidade-input" readonly value="0" aria-label="Quantidade de colaboradores selecionados">
+            <div class="bloco-item-top-right">
+                <span class="bloco-item-count">0</span>
+                <button type="button" class="btn-remover-bloco" title="Remover">×</button>
             </div>
         </div>
-        <div class="form-group">
-            <label>Colaboradores</label>
-            <input type="search" class="busca-colab-bloco" placeholder="Filtrar colaboradores por matrícula ou nome..." aria-label="Filtrar colaboradores desta função">
+        <div class="bloco-item-body">
+            <div class="bloco-grid">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Função</label>
+                    <select class="funcao-select" required aria-label="Função">
+                        <option value="">Selecione a função</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Filtrar colaboradores</label>
+                    <input type="search" class="busca-colab-bloco" placeholder="Matrícula ou nome…" aria-label="Filtrar colaboradores desta função">
+                </div>
+            </div>
+            <input type="number" class="quantidade-input" hidden readonly value="0" aria-hidden="true" tabindex="-1">
             <div class="colaboradores-container"></div>
         </div>
     </div>
@@ -146,20 +184,22 @@
             <span class="bloco-item-badge badge-equip">Equipamento</span>
             <button type="button" class="btn-remover-bloco" title="Remover">×</button>
         </div>
-        <div class="bloco-grid">
-            <div class="form-group">
-                <label>Equipamento</label>
-                <select class="equipamento-select" aria-label="Equipamento">
-                    <option value="">Selecione o Equipamento</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Operador</label>
-                <div class="combobox" data-role="operador">
-                    <input type="search" class="operador-busca" placeholder="Buscar por matrícula ou nome..." autocomplete="off" aria-label="Buscar operador por matrícula ou nome">
-                    <input type="hidden" class="operador-valor">
-                    <div class="combobox-lista" hidden></div>
-                    <div class="combobox-selecionado" hidden></div>
+        <div class="bloco-item-body">
+            <div class="bloco-grid">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Equipamento</label>
+                    <select class="equipamento-select" aria-label="Equipamento">
+                        <option value="">Selecione o equipamento</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Operador</label>
+                    <div class="combobox" data-role="operador">
+                        <input type="search" class="operador-busca" placeholder="Buscar por matrícula ou nome…" autocomplete="off" aria-label="Buscar operador por matrícula ou nome">
+                        <input type="hidden" class="operador-valor">
+                        <div class="combobox-lista" hidden></div>
+                        <div class="combobox-selecionado" hidden></div>
+                    </div>
                 </div>
             </div>
         </div>
