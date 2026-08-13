@@ -4,44 +4,89 @@
 {% include "_head.html" %}
 </head>
 <body>
+{% set tabs = [
+    ('admin_home', url_for('admin_home'), 'Visão geral'),
+    ('admin_solicitacoes', url_for('admin_solicitacoes'), 'Solicitações'),
+    ('admin_efetivo', url_for('admin_efetivo'), 'Efetivo'),
+    ('admin_config', url_for('admin_config'), 'Configuração'),
+    ('admin_usuarios', url_for('admin_usuarios'), 'Usuários'),
+    ('admin_auditoria', url_for('admin_auditoria'), 'Auditoria'),
+] %}
 <div class="admin-shell">
-    <div class="admin-header">
-        <div class="admin-header-row">
-            <div class="admin-brand">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="">
-                <div class="hero-divider"></div>
-                <span class="admin-brand-title">Administração</span>
-            </div>
-            <div class="admin-user">
-                <span class="admin-user-chip">
-                    <span class="admin-user-avatar">{{ (user.nome or user.usuario or '?')[:2]|upper }}</span>
-                    <span class="admin-user-name">{{ user.nome or user.usuario }}</span>
-                </span>
-                <a href="{{ url_for('admin_logout') }}" title="Sair" class="btn-icon">
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path></svg>
-                </a>
-            </div>
+    <aside class="admin-sidebar">
+        <div class="admin-sidebar-brand">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="">
+            <span class="admin-sidebar-divider"></span>
+            <span class="admin-brand-title">Administração</span>
         </div>
-        <div class="admin-tabs">
-            <div class="admin-tabs-row">
-                {% set tabs = [
-                    ('admin_home', url_for('admin_home'), 'Visão geral'),
-                    ('admin_solicitacoes', url_for('admin_solicitacoes'), 'Solicitações'),
-                    ('admin_efetivo', url_for('admin_efetivo'), 'Efetivo'),
-                    ('admin_config', url_for('admin_config'), 'Configuração'),
-                    ('admin_usuarios', url_for('admin_usuarios'), 'Usuários'),
-                    ('admin_auditoria', url_for('admin_auditoria'), 'Auditoria'),
-                ] %}
-                {% for endpoint, href, label in tabs %}
-                <a href="{{ href }}" class="admin-tab{{ ' active' if request.endpoint == endpoint else '' }}">{{ label }}<span class="admin-tab-indicator"></span></a>
-                {% endfor %}
+        <nav class="admin-nav">
+            {% for endpoint, href, label in tabs %}
+            <a href="{{ href }}" class="admin-nav-item{{ ' active' if request.endpoint == endpoint else '' }}">{{ label }}</a>
+            {% endfor %}
+        </nav>
+        <div class="admin-sidebar-footer">
+            <div class="admin-user-chip">
+                <span class="admin-user-avatar">{{ (user.nome or user.usuario or '?')[:2]|upper }}</span>
+                <span class="admin-user-name">{{ user.nome or user.usuario }}</span>
             </div>
+            <a href="{{ url_for('index') }}" class="admin-sidebar-link">Área pública</a>
+            <a href="{{ url_for('admin_logout') }}" class="admin-sidebar-link">Sair</a>
         </div>
-    </div>
+    </aside>
+
+    <header class="admin-topbar-mobile">
+        <div class="admin-topbar-mobile-brand">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="">
+            <span class="admin-brand-title">Administração</span>
+        </div>
+        <span class="admin-user-avatar">{{ (user.nome or user.usuario or '?')[:2]|upper }}</span>
+    </header>
+
     <div class="admin-content">
         {% block content %}{% endblock %}
     </div>
+
+    <nav class="admin-bottom-nav">
+        <a href="{{ url_for('admin_home') }}" class="admin-bottom-nav-item{{ ' active' if request.endpoint == 'admin_home' else '' }}">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-4H4zM14 8h6V4h-6z"></path></svg>
+            Visão geral
+        </a>
+        <a href="{{ url_for('admin_solicitacoes') }}" class="admin-bottom-nav-item{{ ' active' if request.endpoint == 'admin_solicitacoes' else '' }}">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v16H6zM9 9h6M9 13h6"></path></svg>
+            Solicitações
+        </a>
+        <a href="{{ url_for('admin_efetivo') }}" class="admin-bottom-nav-item{{ ' active' if request.endpoint == 'admin_efetivo' else '' }}">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"></circle><path d="M3.5 19c.6-3 2.9-4.6 5.5-4.6S13.9 16 14.5 19M17 11h4M17 15h4"></path></svg>
+            Efetivo
+        </a>
+        <button type="button" class="admin-bottom-nav-item{{ ' active' if request.endpoint in ['admin_config', 'admin_usuarios', 'admin_auditoria'] else '' }}" id="btn-admin-mais">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg>
+            Mais
+        </button>
+    </nav>
+    <div class="admin-more-menu" id="admin-more-menu" hidden>
+        <a href="{{ url_for('admin_config') }}"{{ ' class="active"'|safe if request.endpoint == 'admin_config' else '' }}>Configuração</a>
+        <a href="{{ url_for('admin_usuarios') }}"{{ ' class="active"'|safe if request.endpoint == 'admin_usuarios' else '' }}>Usuários</a>
+        <a href="{{ url_for('admin_auditoria') }}"{{ ' class="active"'|safe if request.endpoint == 'admin_auditoria' else '' }}>Auditoria</a>
+        <div class="admin-more-menu-divider"></div>
+        <a href="{{ url_for('index') }}">Área pública</a>
+        <a href="{{ url_for('admin_logout') }}">Sair</a>
+    </div>
 </div>
+<script>
+(function () {
+    var btn = document.getElementById('btn-admin-mais');
+    var menu = document.getElementById('admin-more-menu');
+    if (!btn || !menu) return;
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        menu.hidden = !menu.hidden;
+    });
+    document.addEventListener('click', function (e) {
+        if (!menu.hidden && !menu.contains(e.target) && e.target !== btn) menu.hidden = true;
+    });
+})();
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

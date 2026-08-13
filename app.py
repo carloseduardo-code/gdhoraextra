@@ -407,7 +407,7 @@ def contar_efetivo():
 # ------------------- ÁREA PÚBLICA -------------------
 @app.route("/")
 def index():
-    return render_template("index.html", efetivo_total=contar_efetivo())
+    return render_template("index.html", efetivo_total=contar_efetivo(), data_hoje=data_extenso_hoje())
 
 
 @app.route("/solicitacao")
@@ -462,7 +462,17 @@ def admin_logout():
 
 DIAS_PT = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
 MESES_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
+DIAS_EXTENSO_PT = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
+MESES_EXTENSO_PT = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+]
 TURNO_CSS = {"Dia": "t-dia", "Noite": "t-noite", "Extensão de Horário": "t-ext"}
+
+
+def data_extenso_hoje():
+    hoje = datetime.now().date()
+    return f"{DIAS_EXTENSO_PT[hoje.weekday()]}, {hoje.day} de {MESES_EXTENSO_PT[hoje.month - 1]} de {hoje.year}"
 
 
 def turno_css(turno):
