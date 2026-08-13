@@ -135,10 +135,6 @@ textarea:focus-visible {
     border: 1px solid var(--border);
 }
 
-.container.wide {
-    max-width: 1080px;
-}
-
 /* ---------- Cabeçalho simples (login, telas soltas) ---------- */
 .page-header {
     display: flex;
@@ -2128,11 +2124,7 @@ textarea {
 /* ---------- Admin shell (header + tabs) ---------- */
 .admin-shell {
     background: var(--bg-frame);
-    min-height: calc(100vh - 48px);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    border: 1px solid var(--border-2);
-    box-shadow: var(--shadow-frame);
+    min-height: 100vh;
 }
 
 .admin-header {
