@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import time
 from datetime import datetime, timedelta
 from functools import wraps
 from io import BytesIO
@@ -12,7 +13,6 @@ from flask import (
 )
 from supabase import create_client, Client
 from dotenv import load_dotenv
-import pandas as pd
 
 import db as auth_db
 
@@ -32,6 +32,35 @@ supabase_key = (
 supabase: Client | None = None
 if supabase_url and supabase_key:
     supabase = create_client(supabase_url, supabase_key)
+
+
+# ------------------- CACHE SIMPLES EM MEMÓRIA -------------------
+# Evita reconsultar o Supabase a cada request para dados que mudam raramente
+# (efetivo, opções de formulário, métricas do dashboard). Válido por instância
+# do processo: numa cold start da Vercel o cache começa vazio de novo, mas
+# entre requests de uma mesma instância "quente" evita round-trips repetidos.
+_cache = {}
+CACHE_TTL_PADRAO = 45  # segundos
+
+
+def cache_get(chave):
+    item = _cache.get(chave)
+    if not item:
+        return None
+    valor, expira_em = item
+    if time.time() > expira_em:
+        del _cache[chave]
+        return None
+    return valor
+
+
+def cache_set(chave, valor, ttl=CACHE_TTL_PADRAO):
+    _cache[chave] = (valor, time.time() + ttl)
+
+
+def cache_invalidar(*chaves):
+    for chave in chaves:
+        _cache.pop(chave, None)
 
 
 # ------------------- HELPERS -------------------
@@ -257,7 +286,18 @@ def salvar_opcoes_arquivo(data):
 
 def _opcoes_para_api():
     """Opções editáveis (equipamento, setor, AS, turno): Supabase quando configurado,
-    arquivo local como fallback (uso em desenvolvimento sem Supabase)."""
+    arquivo local como fallback (uso em desenvolvimento sem Supabase). Cacheada em
+    memória — invalidada explicitamente nas rotas que criam/editam/removem opções."""
+    cached = cache_get("opcoes_api")
+    if cached is not None:
+        return cached
+
+    resultado = _opcoes_para_api_sem_cache()
+    cache_set("opcoes_api", resultado)
+    return resultado
+
+
+def _opcoes_para_api_sem_cache():
     if supabase is not None:
         try:
             res = supabase.table("form_opcoes").select("*").eq("ativo", True).order("ordem").execute()
@@ -306,6 +346,11 @@ def _garantir_outros(resultado):
 def carregar_formulario_config():
     """Campos fixos + opções editáveis, priorizando o arquivo local de configuração."""
     opcoes = _opcoes_para_api()
+
+    cache_campos = cache_get("form_campos")
+    if cache_campos is not None:
+        return {"campos": cache_campos["campos"], "opcoes": opcoes, "fonte": cache_campos["fonte"]}
+
     campos = DEFAULT_CAMPOS
     fonte = "arquivo"
 
@@ -329,6 +374,7 @@ def carregar_formulario_config():
         except Exception:
             campos = DEFAULT_CAMPOS
 
+    cache_set("form_campos", {"campos": campos, "fonte": fonte})
     return {
         "campos": campos,
         "opcoes": opcoes,
@@ -336,12 +382,24 @@ def carregar_formulario_config():
     }
 
 
-def contar_efetivo():
+def carregar_funcionarios():
+    """Lista completa de funcionários (efetivo), cacheada em memória — evita
+    reconsultar o Supabase a cada campo do formulário público (função,
+    colaboradores) que hoje bate nessa mesma tabela repetidamente."""
+    cached = cache_get("funcionarios")
+    if cached is not None:
+        return cached
     if supabase is None:
-        return 0
+        return []
+    res = supabase.table("funcionarios").select("matricula, nome, funcao").order("nome").execute()
+    rows = res.data or []
+    cache_set("funcionarios", rows)
+    return rows
+
+
+def contar_efetivo():
     try:
-        res = supabase.table("funcionarios").select("matricula", count="exact").execute()
-        return int(getattr(res, "count", None) or len(res.data or []))
+        return len(carregar_funcionarios())
     except Exception:
         return 0
 
@@ -425,6 +483,13 @@ def _parse_dt(valor):
 
 
 def calcular_metricas_dashboard():
+    cached = cache_get("dashboard_metricas")
+    if cached is not None:
+        return cached
+    return _calcular_metricas_dashboard_sem_cache()
+
+
+def _calcular_metricas_dashboard_sem_cache():
     vazio = {
         "metrics": [
             {"label": "Solicitações hoje", "value": 0, "delta": "", "delta_dir": "", "hint": ""},
@@ -571,7 +636,7 @@ def calcular_metricas_dashboard():
             "turno_css": turno_css(turno),
         })
 
-    return {
+    resultado = {
         "metrics": metrics,
         "dias": dias,
         "top_funcoes": top_funcoes,
@@ -579,6 +644,8 @@ def calcular_metricas_dashboard():
         "recentes": recentes,
         "total_solicitacoes": len(dados),
     }
+    cache_set("dashboard_metricas", resultado, ttl=30)
+    return resultado
 
 
 @app.route("/admin")
@@ -769,8 +836,7 @@ def get_formulario():
 @app.route("/api/funcoes", methods=["GET"])
 def get_funcoes():
     try:
-        res = supabase.table("funcionarios").select("funcao").execute()
-        funcoes = sorted({row["funcao"] for row in res.data if row.get("funcao")})
+        funcoes = sorted({row["funcao"] for row in carregar_funcionarios() if row.get("funcao")})
         return jsonify(funcoes)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -781,11 +847,10 @@ def get_colaboradores():
     funcao = request.args.get("funcao")
     q = (request.args.get("q") or "").strip().lower()
     try:
-        query = supabase.table("funcionarios").select("matricula, nome, funcao")
+        rows = carregar_funcionarios()
         if funcao:
-            query = query.eq("funcao", funcao)
-        res = query.order("nome").execute()
-        rows = res.data or []
+            rows = [r for r in rows if r.get("funcao") == funcao]
+        rows = sorted(rows, key=lambda r: r.get("nome") or "")
         if q:
             rows = [
                 r for r in rows
@@ -918,6 +983,7 @@ def create_solicitacao():
             "turno": turno,
             "itens": len(itens_norm),
         })
+        cache_invalidar("dashboard_metricas")
 
         return jsonify({
             "message": "Solicitação criada",
@@ -1020,6 +1086,7 @@ def apagar_solicitacao(sol_id):
             "resumo_admin": snapshot.get("resumo_admin"),
             "itens": len(snapshot.get("solicitacao_itens") or []),
         })
+        cache_invalidar("dashboard_metricas")
         return jsonify({"ok": True, "message": "Solicitação removida"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1158,6 +1225,7 @@ def editar_solicitacao_admin(sol_id):
             },
             "itens": len(itens_norm),
         })
+        cache_invalidar("dashboard_metricas")
 
         return jsonify({
             "message": "Solicitação atualizada",
@@ -1172,6 +1240,7 @@ def editar_solicitacao_admin(sol_id):
 @app.route("/api/admin/exportar", methods=["GET"])
 @api_admin_required
 def exportar_excel():
+    import pandas as pd
     try:
         sol_res = (
             supabase.table("solicitacoes")
@@ -1246,13 +1315,7 @@ def exportar_excel():
 def listar_efetivo():
     q = (request.args.get("q") or "").strip().lower()
     try:
-        res = (
-            supabase.table("funcionarios")
-            .select("matricula, nome, funcao")
-            .order("nome")
-            .execute()
-        )
-        rows = res.data or []
+        rows = carregar_funcionarios()
         if q:
             rows = [
                 r for r in rows
@@ -1268,6 +1331,7 @@ def listar_efetivo():
 @app.route("/api/efetivo/importar", methods=["POST"])
 @api_admin_required
 def importar_planilha():
+    import pandas as pd
     if "arquivo" not in request.files:
         return jsonify({"error": "Nenhum arquivo enviado."}), 400
 
@@ -1321,6 +1385,7 @@ def importar_planilha():
         for i in range(0, len(registros), 500):
             supabase.table("funcionarios").upsert(registros[i:i + 500]).execute()
 
+        cache_invalidar("funcionarios")
         auditar("importar", "efetivo", None, {"total": len(df), "arquivo": arquivo.filename})
         return jsonify({
             "message": f"Importação concluída! {len(df)} colaboradores importados.",
@@ -1386,6 +1451,7 @@ def config_criar_opcao():
             }).execute()
             row = res.data[0]
             auditar("criar", "config_opcao", row["id"], {"grupo": grupo, "valor": valor})
+            cache_invalidar("opcoes_api")
             return jsonify({"id": row["id"], "grupo": grupo, "valor": valor, "label": valor}), 201
 
         raw = carregar_opcoes_arquivo()
@@ -1396,6 +1462,7 @@ def config_criar_opcao():
         raw[grupo] = lista
         salvar_opcoes_arquivo(raw)
         auditar("criar", "config_opcao", None, {"grupo": grupo, "valor": valor})
+        cache_invalidar("opcoes_api")
         return jsonify({"id": len(lista), "grupo": grupo, "valor": valor, "label": valor}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1420,6 +1487,7 @@ def config_atualizar_opcao(opcao_id):
             grupo_final = grupo or antigo["grupo"]
             supabase.table("form_opcoes").update({"valor": novo, "label": novo}).eq("id", opcao_id).execute()
             auditar("editar", "config_opcao", opcao_id, {"grupo": grupo_final, "de": antigo["valor"], "para": novo})
+            cache_invalidar("opcoes_api")
             return jsonify({"id": opcao_id, "grupo": grupo_final, "valor": novo, "label": novo})
 
         if grupo not in GRUPOS_CONFIG:
@@ -1434,6 +1502,7 @@ def config_atualizar_opcao(opcao_id):
         raw[grupo] = lista
         salvar_opcoes_arquivo(raw)
         auditar("editar", "config_opcao", opcao_id, {"grupo": grupo, "de": antigo, "para": novo})
+        cache_invalidar("opcoes_api")
         return jsonify({"id": opcao_id, "grupo": grupo, "valor": novo, "label": novo})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1456,6 +1525,7 @@ def config_remover_opcao(opcao_id):
             antigo = existente.data[0]
             supabase.table("form_opcoes").delete().eq("id", opcao_id).execute()
             auditar("remover", "config_opcao", opcao_id, {"grupo": antigo["grupo"], "valor": antigo["valor"]})
+            cache_invalidar("opcoes_api")
             return jsonify({"ok": True})
 
         if grupo not in GRUPOS_CONFIG:
@@ -1469,6 +1539,7 @@ def config_remover_opcao(opcao_id):
         raw[grupo] = lista
         salvar_opcoes_arquivo(raw)
         auditar("remover", "config_opcao", opcao_id, {"grupo": grupo, "valor": removido})
+        cache_invalidar("opcoes_api")
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1488,11 +1559,13 @@ def config_reordenar_opcoes():
         if supabase is not None:
             for i, v in enumerate(valores, 1):
                 supabase.table("form_opcoes").update({"ordem": i}).eq("grupo", grupo).eq("valor", str(v).strip()).execute()
+            cache_invalidar("opcoes_api")
             return jsonify({"ok": True, "total": len(valores)})
 
         raw = carregar_opcoes_arquivo()
         raw[grupo] = [str(v).strip() for v in valores if str(v).strip()]
         salvar_opcoes_arquivo(raw)
+        cache_invalidar("opcoes_api")
         return jsonify({"ok": True, "total": len(raw[grupo])})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
