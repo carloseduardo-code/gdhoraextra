@@ -1,5 +1,6 @@
 let debounce = null;
 let termoAtual = '';
+let dataAtual = '';
 let solsAtuais = new Map();
 let edicaoAbertaId = null;
 
@@ -16,18 +17,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const busca = document.getElementById('busca');
     busca.addEventListener('input', () => {
         clearTimeout(debounce);
-        debounce = setTimeout(() => carregar(busca.value.trim()), 250);
+        debounce = setTimeout(() => carregar(busca.value.trim(), dataAtual), 250);
     });
     document.getElementById('btn-exportar').addEventListener('click', exportarExcel);
+
+    const filtroData = document.getElementById('filtro-data');
+    const btnLimparData = document.getElementById('btn-limpar-data');
+    filtroData.addEventListener('change', () => {
+        btnLimparData.hidden = !filtroData.value;
+        carregar(termoAtual, filtroData.value);
+    });
+    btnLimparData.addEventListener('click', () => {
+        filtroData.value = '';
+        btnLimparData.hidden = true;
+        carregar(termoAtual, '');
+    });
 });
 
-async function carregar(q) {
+async function carregar(q, data) {
     termoAtual = q || '';
+    dataAtual = data ?? dataAtual;
     const box = document.getElementById('lista-solicitacoes');
     const countLabel = document.getElementById('sol-count-label');
     box.innerHTML = '<p class="hint">Carregando...</p>';
     try {
-        const res = await fetch('/api/admin/solicitacoes?q=' + encodeURIComponent(termoAtual));
+        const params = new URLSearchParams({ q: termoAtual });
+        if (dataAtual) params.set('data', dataAtual);
+        const res = await fetch('/api/admin/solicitacoes?' + params.toString());
         const dados = await res.json();
         if (!res.ok) throw new Error(dados.error || 'Erro');
 

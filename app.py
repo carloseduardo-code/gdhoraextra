@@ -955,6 +955,7 @@ def get_solicitacao(sol_id):
 @api_admin_required
 def listar_solicitacoes_admin():
     q = (request.args.get("q") or "").strip().lower()
+    data_filtro = (request.args.get("data") or "").strip()
     try:
         sol_res = (
             supabase.table("solicitacoes")
@@ -963,6 +964,8 @@ def listar_solicitacoes_admin():
             .execute()
         )
         dados = sol_res.data or []
+        if data_filtro:
+            dados = [s for s in dados if str(s.get("data_solicitacao") or "") == data_filtro]
         if q:
             filtrados = []
             for s in dados:
