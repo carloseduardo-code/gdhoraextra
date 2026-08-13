@@ -255,8 +255,29 @@ def salvar_opcoes_arquivo(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def _opcoes_para_api(raw=None):
-    raw = raw or carregar_opcoes_arquivo()
+def _opcoes_para_api():
+    """Opções editáveis (equipamento, setor, AS, turno): Supabase quando configurado,
+    arquivo local como fallback (uso em desenvolvimento sem Supabase)."""
+    if supabase is not None:
+        try:
+            res = supabase.table("form_opcoes").select("*").eq("ativo", True).order("ordem").execute()
+            rows = res.data or []
+            if rows:
+                resultado = {}
+                for r in rows:
+                    resultado.setdefault(r["grupo"], []).append({
+                        "id": r["id"],
+                        "valor": r["valor"],
+                        "label": r.get("label") or r["valor"],
+                        "ordem": r.get("ordem", 0),
+                        "ativo": r.get("ativo", True),
+                    })
+                _garantir_outros(resultado)
+                return resultado
+        except Exception:
+            pass
+
+    raw = carregar_opcoes_arquivo()
     resultado = {}
     for g, vals in raw.items():
         resultado[g] = [
@@ -264,11 +285,16 @@ def _opcoes_para_api(raw=None):
             for i, v in enumerate(vals, 1)
             if str(v).strip()
         ]
-    # Garante Outros em AS
+    _garantir_outros(resultado)
+    return resultado
+
+
+def _garantir_outros(resultado):
+    """Garante a opção 'Outros' na lista de AS, mesmo que falte na fonte de dados."""
     as_opts = resultado.setdefault("as_code", [])
     if not any(str(o.get("valor", "")).lower() == "outros" for o in as_opts):
         as_opts.append({
-            "id": len(as_opts) + 1,
+            "id": 0,
             "valor": "Outros",
             "label": "Outros",
             "ordem": len(as_opts) + 1,
@@ -279,7 +305,7 @@ def _opcoes_para_api(raw=None):
 
 def carregar_formulario_config():
     """Campos fixos + opções editáveis, priorizando o arquivo local de configuração."""
-    opcoes = _opcoes_para_api(carregar_opcoes_arquivo())
+    opcoes = _opcoes_para_api()
     campos = DEFAULT_CAMPOS
     fonte = "arquivo"
 
@@ -668,6 +694,8 @@ def frase_auditoria(log):
         return f"criou a solicitação #{eid}" if eid else "criou uma solicitação"
     if entidade == "solicitacao" and acao == "remover":
         return f"apagou a solicitação #{eid}" if eid else "apagou uma solicitação"
+    if entidade == "solicitacao" and acao == "editar":
+        return f"editou a solicitação #{eid}" if eid else "editou uma solicitação"
     if entidade == "efetivo" and acao == "importar":
         total = det.get("total")
         return f"importou planilha com {total} colaboradores" if total else "importou uma planilha de efetivo"
@@ -868,10 +896,7 @@ def create_solicitacao():
             "resumo_admin": resumo_admin,
         }
 
-        try:
-            sol_res = supabase.table("solicitacoes").insert({**sol_payload, **extras}).execute()
-        except Exception:
-            sol_res = supabase.table("solicitacoes").insert(sol_payload).execute()
+        sol_res = supabase.table("solicitacoes").insert({**sol_payload, **extras}).execute()
 
         solicitacao_id = sol_res.data[0]["id"]
 
@@ -993,6 +1018,150 @@ def apagar_solicitacao(sol_id):
             "itens": len(snapshot.get("solicitacao_itens") or []),
         })
         return jsonify({"ok": True, "message": "Solicitação removida"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/solicitacoes/<int:sol_id>", methods=["PUT"])
+@api_admin_required
+def editar_solicitacao_admin(sol_id):
+    try:
+        existente = (
+            supabase.table("solicitacoes")
+            .select("*, solicitacao_itens(*)")
+            .eq("id", sol_id)
+            .limit(1)
+            .execute()
+        )
+        if not existente.data:
+            return jsonify({"error": "Solicitação não encontrada"}), 404
+        antes = existente.data[0]
+
+        data = request.get_json() or {}
+        solicitante = (data.get("solicitante") or "").strip()
+        setor_solicitante = (data.get("setor_solicitante") or data.get("setor") or "").strip()
+        equipamento = (data.get("equipamento") or "").strip()
+        as_code = (data.get("as_code") or data.get("as") or "").strip()
+        if (as_code or "").lower() == "outros":
+            as_code = (data.get("as_code_outros") or "").strip()
+        data_solicitacao = data.get("data_solicitacao") or data.get("data")
+        turno = data.get("turno")
+        observacao = (data.get("observacao") or "").strip()
+        itens = data.get("itens", [])
+        equipamentos = data.get("equipamentos", [])
+
+        if not solicitante:
+            return jsonify({"error": "Solicitante é obrigatório"}), 400
+        if not data_solicitacao:
+            return jsonify({"error": "Data da solicitação é obrigatória"}), 400
+
+        itens_norm = []
+        for item in itens:
+            cols_raw = item.get("colaboradores") or []
+            cols = [normalizar_colaborador(c) for c in cols_raw]
+            if not cols:
+                continue
+            qtd = int(item.get("quantidade") or len(cols))
+            itens_norm.append({
+                "funcao": item.get("funcao"),
+                "quantidade": qtd,
+                "colaboradores": cols,
+                "tipo": "funcao",
+            })
+
+        for eq in equipamentos or []:
+            nome_eq = (eq.get("equipamento") or "").strip()
+            if not nome_eq:
+                continue
+            cols = []
+            op = eq.get("operador")
+            if op:
+                cols.append(normalizar_colaborador(op))
+            for c in eq.get("colaboradores") or []:
+                cols.append(normalizar_colaborador(c))
+            seen = set()
+            cols_uniq = []
+            for c in cols:
+                key = (c.get("matricula"), c.get("nome"), c.get("a_procura"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                cols_uniq.append(c)
+            itens_norm.append({
+                "funcao": nome_eq,
+                "equipamento": nome_eq,
+                "quantidade": max(1, len(cols_uniq)),
+                "colaboradores": cols_uniq,
+                "tipo": "equipamento",
+            })
+            if not equipamento:
+                equipamento = nome_eq
+
+        if not itens_norm:
+            return jsonify({
+                "error": "Adicione ao menos uma função com colaboradores ou um equipamento com operador"
+            }), 400
+
+        meta = {
+            "solicitante": solicitante or None,
+            "setor": setor_solicitante or None,
+            "setor_solicitante": setor_solicitante or None,
+            "equipamento": equipamento or None,
+            "as_code": as_code or None,
+            "data_solicitacao": data_solicitacao,
+            "turno": turno,
+            "observacao": observacao or None,
+        }
+        resumo = gerar_resumo(meta, itens_norm)
+        resumo_admin = gerar_resumo_admin(meta, itens_norm)
+
+        sol_payload = {
+            "setor": setor_solicitante or as_code or "N/A",
+            "as_code": as_code or equipamento or "N/A",
+            "data_solicitacao": data_solicitacao,
+            "turno": turno or "Dia",
+            "solicitante": solicitante or None,
+            "setor_solicitante": setor_solicitante or None,
+            "equipamento": equipamento or None,
+            "observacao": observacao or None,
+            "resumo_texto": resumo,
+            "resumo_admin": resumo_admin,
+        }
+        supabase.table("solicitacoes").update(sol_payload).eq("id", sol_id).execute()
+
+        supabase.table("solicitacao_itens").delete().eq("solicitacao_id", sol_id).execute()
+        for item in itens_norm:
+            supabase.table("solicitacao_itens").insert({
+                "solicitacao_id": sol_id,
+                "funcao": item["funcao"],
+                "quantidade": item["quantidade"],
+                "colaboradores": item["colaboradores"],
+            }).execute()
+
+        auditar("editar", "solicitacao", sol_id, {
+            "antes": {
+                "solicitante": antes.get("solicitante"),
+                "setor": antes.get("setor_solicitante") or antes.get("setor"),
+                "as_code": antes.get("as_code"),
+                "data_solicitacao": antes.get("data_solicitacao"),
+                "turno": antes.get("turno"),
+            },
+            "depois": {
+                "solicitante": solicitante or None,
+                "setor": setor_solicitante or None,
+                "as_code": as_code or None,
+                "data_solicitacao": data_solicitacao,
+                "turno": turno,
+            },
+            "itens": len(itens_norm),
+        })
+
+        return jsonify({
+            "message": "Solicitação atualizada",
+            "id": sol_id,
+            "resumo": resumo,
+            "resumo_admin": resumo_admin,
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1195,6 +1364,27 @@ def config_criar_opcao():
     if not valor:
         return jsonify({"error": "Informe o valor da opção"}), 400
     try:
+        if supabase is not None:
+            existente = (
+                supabase.table("form_opcoes")
+                .select("id").eq("grupo", grupo).ilike("valor", valor)
+                .execute()
+            )
+            if existente.data:
+                return jsonify({"error": "Essa opção já existe"}), 400
+            maior = (
+                supabase.table("form_opcoes")
+                .select("ordem").eq("grupo", grupo).order("ordem", desc=True).limit(1)
+                .execute()
+            )
+            proxima_ordem = ((maior.data[0]["ordem"] if maior.data else 0) or 0) + 1
+            res = supabase.table("form_opcoes").insert({
+                "grupo": grupo, "valor": valor, "label": valor, "ordem": proxima_ordem,
+            }).execute()
+            row = res.data[0]
+            auditar("criar", "config_opcao", row["id"], {"grupo": grupo, "valor": valor})
+            return jsonify({"id": row["id"], "grupo": grupo, "valor": valor, "label": valor}), 201
+
         raw = carregar_opcoes_arquivo()
         lista = list(raw.get(grupo) or [])
         if any(str(v).strip().lower() == valor.lower() for v in lista):
@@ -1213,12 +1403,24 @@ def config_criar_opcao():
 def config_atualizar_opcao(opcao_id):
     data = request.get_json() or {}
     grupo = (data.get("grupo") or request.args.get("grupo") or "").strip()
-    if grupo not in GRUPOS_CONFIG:
-        return jsonify({"error": "Informe o grupo"}), 400
     novo = (data.get("valor") or data.get("label") or "").strip()
     if not novo:
         return jsonify({"error": "Valor obrigatório"}), 400
     try:
+        if supabase is not None:
+            existente = (
+                supabase.table("form_opcoes").select("id, grupo, valor").eq("id", opcao_id).limit(1).execute()
+            )
+            if not existente.data:
+                return jsonify({"error": "Opção não encontrada"}), 404
+            antigo = existente.data[0]
+            grupo_final = grupo or antigo["grupo"]
+            supabase.table("form_opcoes").update({"valor": novo, "label": novo}).eq("id", opcao_id).execute()
+            auditar("editar", "config_opcao", opcao_id, {"grupo": grupo_final, "de": antigo["valor"], "para": novo})
+            return jsonify({"id": opcao_id, "grupo": grupo_final, "valor": novo, "label": novo})
+
+        if grupo not in GRUPOS_CONFIG:
+            return jsonify({"error": "Informe o grupo"}), 400
         raw = carregar_opcoes_arquivo()
         lista = list(raw.get(grupo) or [])
         idx = opcao_id - 1
@@ -1238,12 +1440,23 @@ def config_atualizar_opcao(opcao_id):
 @api_admin_required
 def config_remover_opcao(opcao_id):
     grupo = (request.args.get("grupo") or "").strip()
-    if grupo not in GRUPOS_CONFIG:
+    if not grupo:
         body = request.get_json(silent=True) or {}
         grupo = (body.get("grupo") or "").strip()
-    if grupo not in GRUPOS_CONFIG:
-        return jsonify({"error": "Informe o grupo"}), 400
     try:
+        if supabase is not None:
+            existente = (
+                supabase.table("form_opcoes").select("id, grupo, valor").eq("id", opcao_id).limit(1).execute()
+            )
+            if not existente.data:
+                return jsonify({"error": "Opção não encontrada"}), 404
+            antigo = existente.data[0]
+            supabase.table("form_opcoes").delete().eq("id", opcao_id).execute()
+            auditar("remover", "config_opcao", opcao_id, {"grupo": antigo["grupo"], "valor": antigo["valor"]})
+            return jsonify({"ok": True})
+
+        if grupo not in GRUPOS_CONFIG:
+            return jsonify({"error": "Informe o grupo"}), 400
         raw = carregar_opcoes_arquivo()
         lista = list(raw.get(grupo) or [])
         idx = opcao_id - 1
@@ -1269,6 +1482,11 @@ def config_reordenar_opcoes():
     if not isinstance(valores, list):
         return jsonify({"error": "Envie a lista completa de valores"}), 400
     try:
+        if supabase is not None:
+            for i, v in enumerate(valores, 1):
+                supabase.table("form_opcoes").update({"ordem": i}).eq("grupo", grupo).eq("valor", str(v).strip()).execute()
+            return jsonify({"ok": True, "total": len(valores)})
+
         raw = carregar_opcoes_arquivo()
         raw[grupo] = [str(v).strip() for v in valores if str(v).strip()]
         salvar_opcoes_arquivo(raw)
