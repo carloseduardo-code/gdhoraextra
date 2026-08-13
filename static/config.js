@@ -40,13 +40,20 @@ async function carregarOpcoes() {
         }
 
         box.innerHTML = dados.map(o => `
-            <div class="config-item-row" data-id="${o.id}">
+            <div class="config-item-row" data-id="${o.id}" data-valor="${escapar(o.valor)}">
                 <span class="config-item-value">${escapar(o.valor)}</span>
+                <button type="button" class="btn-icon btn-editar-opcao" title="Editar">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                </button>
                 <button type="button" class="btn-icon btn-remover-opcao" title="Remover">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 7h14M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg>
                 </button>
             </div>
         `).join('');
+
+        box.querySelectorAll('.btn-editar-opcao').forEach(btn => {
+            btn.addEventListener('click', () => iniciarEdicaoOpcao(btn.closest('.config-item-row')));
+        });
 
         box.querySelectorAll('.btn-remover-opcao').forEach(btn => {
             btn.addEventListener('click', async () => {
@@ -67,6 +74,52 @@ async function carregarOpcoes() {
     } catch (e) {
         box.innerHTML = `<p class="hint" style="padding:16px 18px;margin:0;">Erro: ${esc(e.message)}</p>`;
     }
+}
+
+function iniciarEdicaoOpcao(row) {
+    if (!row || row.classList.contains('editando')) return;
+    row.classList.add('editando');
+    const valorAtual = row.dataset.valor || '';
+    row.innerHTML = `
+        <input type="text" class="config-item-edit-input" value="${escapar(valorAtual)}" aria-label="Editar opção">
+        <button type="button" class="btn-icon btn-salvar-opcao" title="Salvar">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+        </button>
+        <button type="button" class="btn-icon btn-cancelar-opcao" title="Cancelar">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+        </button>
+    `;
+    const input = row.querySelector('.config-item-edit-input');
+    input.focus();
+    input.select();
+
+    const salvar = () => salvarEdicaoOpcao(row, input.value.trim());
+    row.querySelector('.btn-salvar-opcao').addEventListener('click', salvar);
+    row.querySelector('.btn-cancelar-opcao').addEventListener('click', () => carregarOpcoes());
+    input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); salvar(); }
+        if (ev.key === 'Escape') carregarOpcoes();
+    });
+}
+
+async function salvarEdicaoOpcao(row, novoValor) {
+    if (!novoValor) {
+        alert('Informe o valor da opção');
+        return;
+    }
+    const id = row.dataset.id;
+    const res = await fetch('/api/admin/config/opcoes/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grupo: grupoAtual, valor: novoValor }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+        alert(data.error || 'Erro ao salvar');
+        return;
+    }
+    statusMsg('Atualizado.');
+    await carregarOpcoes();
 }
 
 async function criarOpcao(e) {
