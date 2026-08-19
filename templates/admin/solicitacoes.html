@@ -24,34 +24,47 @@
     <button type="button" class="btn-secondary" id="btn-limpar-data" hidden>Limpar data</button>
 </div>
 
-<div id="lista-solicitacoes" style="display:flex;flex-direction:column;gap:10px;margin-top:18px;">
-    <p class="hint">Carregando...</p>
+<div class="sol-lista-cabecalho" id="sol-lista-cabecalho" aria-hidden="true" hidden>
+    <span>Data · turno</span><span>Solicitante</span><span>Setor</span><span>AS</span><span class="dir">Pessoas</span><span class="dir">Ações</span>
+</div>
+<div id="lista-solicitacoes" class="sol-lista" style="margin-top:18px;">
+    <p class="hint">Carregando…</p>
 </div>
 
 <template id="admin-bloco-template">
     <div class="bloco-item bloco-funcao">
-        <div class="bloco-item-top">
-            <span class="bloco-item-badge">Função</span>
-            <div class="bloco-item-top-right">
-                <span class="bloco-item-count">0</span>
-                <button type="button" class="btn-remover-bloco" title="Remover">×</button>
-            </div>
+        <div class="bloco-talao">
+            <span class="bloco-talao-num">01</span>
+            <span class="bloco-talao-nome">Função</span>
+            <span class="bloco-talao-serrilha"></span>
         </div>
-        <div class="bloco-item-body">
-            <div class="bloco-grid">
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Função</label>
-                    <select class="funcao-select" required aria-label="Função">
-                        <option value="">Selecione a função</option>
-                    </select>
+        <div class="bloco-corpo">
+            <div class="bloco-item-top">
+                <div class="bloco-funcao-titulo">
+                    <h3 class="bloco-item-badge">Função</h3>
                 </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Filtrar colaboradores</label>
-                    <input type="search" class="busca-colab-bloco" placeholder="Matrícula ou nome…" aria-label="Filtrar colaboradores desta função">
-                </div>
+                <button type="button" class="btn-remover-bloco" title="Remover função" aria-label="Remover função">×</button>
             </div>
-            <input type="number" class="quantidade-input" hidden readonly value="0" aria-hidden="true" tabindex="-1">
-            <div class="colaboradores-container"></div>
+            <div class="bloco-item-body">
+                <div class="bloco-grid">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Função</label>
+                        <select class="funcao-select" required aria-label="Função">
+                            <option value="">Selecione a função</option>
+                        </select>
+                    </div>
+                    <div class="bloco-item-count" aria-live="polite">
+                        <span class="conta">0</span>
+                        <span class="conta-label">colaboradores marcados</span>
+                    </div>
+                </div>
+                <input type="number" class="quantidade-input" hidden readonly value="0" aria-hidden="true" tabindex="-1">
+                <div style="margin-top:12px;">
+                    <label for="" style="margin-bottom:6px;">Filtrar por matrícula ou nome</label>
+                    <input type="search" class="busca-colab-bloco" placeholder="Matrícula ou nome" aria-label="Filtrar colaboradores desta função">
+                </div>
+                <div class="colaboradores-container" style="margin-top:10px;"></div>
+            </div>
         </div>
     </div>
 </template>

@@ -29,6 +29,9 @@
                 <span class="admin-user-avatar">{{ (user.nome or user.usuario or '?')[:2]|upper }}</span>
                 <span class="admin-user-name">{{ user.nome or user.usuario }}</span>
             </div>
+            <button type="button" class="btn-tema sobre-escuro" data-tema-toggle>
+                <span class="btn-tema-disco"></span><span data-tema-texto>Noite</span>
+            </button>
             <a href="{{ url_for('index') }}" class="admin-sidebar-link">Área pública</a>
             <a href="{{ url_for('admin_logout') }}" class="admin-sidebar-link">Sair</a>
         </div>
@@ -39,7 +42,12 @@
             <img src="{{ url_for('static', filename='logo.png') }}" alt="">
             <span class="admin-brand-title">Administração</span>
         </div>
-        <span class="admin-user-avatar">{{ (user.nome or user.usuario or '?')[:2]|upper }}</span>
+        <div class="admin-topbar-mobile-acoes">
+            <button type="button" class="btn-tema sobre-escuro" data-tema-toggle>
+                <span class="btn-tema-disco"></span><span data-tema-texto>Noite</span>
+            </button>
+            <span class="admin-user-avatar">{{ (user.nome or user.usuario or '?')[:2]|upper }}</span>
+        </div>
     </header>
 
     <div class="admin-content">

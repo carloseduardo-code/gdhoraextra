@@ -15,14 +15,13 @@
                         <div class="wizard-brand-step" id="wizard-brand-step">Etapa 1 de 4 · Dados</div>
                     </div>
                 </div>
-                <a href="{{ url_for('index') }}" class="btn-secondary" style="min-height:36px;padding:0 13px;font-size:13px;">Sair</a>
+                <div class="wizard-topbar-acoes">
+                    <button type="button" class="btn-tema" data-tema-toggle>
+                        <span class="btn-tema-disco"></span><span data-tema-texto>Noite</span>
+                    </button>
+                    <a href="{{ url_for('index') }}" class="btn-secondary" style="min-height:44px;padding:0 14px;font-size:13px;">Sair</a>
+                </div>
             </div>
-            <div class="wizard-progress-track">
-                <div class="wizard-progress-fill" id="wizard-progress-fill" style="width:25%"></div>
-            </div>
-        </div>
-
-        <div class="wizard-body">
             <ol class="wizard-steps" id="wizard-steps" aria-label="Etapas do formulário">
                 <li>
                     <button type="button" class="wizard-step" data-step-indicator="1" data-step-name="Dados">
@@ -61,9 +60,16 @@
                     </button>
                 </li>
             </ol>
+        </div>
 
+        <div class="wizard-body">
+            <div class="wizard-grid">
             <form id="solicitacao-form" novalidate>
                 <section class="form-card" id="card-dados" data-step="1">
+                    <div class="form-card-talao">
+                        <span class="form-card-talao-num">01</span>
+                        <span class="form-card-talao-nome">Dados</span>
+                    </div>
                     <div class="form-card-header">
                         <div>
                             <h2>Dados da solicitação</h2>
@@ -73,23 +79,19 @@
                     <div class="form-card-body campos-grid" id="campos-dinamicos"></div>
                 </section>
 
-                <section class="form-card" id="secao-funcoes" data-step="2">
-                    <div class="form-card-header">
-                        <div>
-                            <h2>Funções e colaboradores</h2>
-                            <p>Marque quem participa de cada função.</p>
-                        </div>
-                    </div>
-                    <div class="form-card-body">
-                        <div id="blocos-container" class="blocos-lista"></div>
-                        <button type="button" id="add-funcao" class="btn-add" style="margin-top:14px;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
-                            Adicionar outra função
-                        </button>
-                    </div>
+                <section id="secao-funcoes" data-step="2">
+                    <div id="blocos-container" class="blocos-lista"></div>
+                    <button type="button" id="add-funcao" class="btn-add" style="margin-top:16px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+                        Adicionar outra função
+                    </button>
                 </section>
 
                 <section class="form-card" id="secao-equipamentos" data-step="3">
+                    <div class="form-card-talao">
+                        <span class="form-card-talao-num">03</span>
+                        <span class="form-card-talao-nome">Equipamentos</span>
+                    </div>
                     <div class="form-card-header">
                         <div>
                             <h2>Equipamentos</h2>
@@ -98,6 +100,10 @@
                     </div>
                     <div class="form-card-body">
                         <div id="equipamentos-container" class="blocos-lista"></div>
+                        <div id="equipamentos-vazio" class="bloco-sem-funcao" style="margin-top:0;">
+                            <div style="font-weight:600;font-size:14px;color:var(--tinta);">Nenhum equipamento nesta solicitação</div>
+                            <div style="margin-top:4px;">Se a equipe usar máquina ou veículo, adicione com o operador responsável.</div>
+                        </div>
                         <button type="button" id="add-equipamento" class="btn-add" style="margin-top:14px;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
                             Adicionar equipamento
@@ -106,6 +112,9 @@
                 </section>
 
                 <section class="form-card" id="secao-observacao" data-step="3">
+                    <div class="form-card-talao">
+                        <span class="form-card-talao-nome">Observação</span>
+                    </div>
                     <div class="form-card-header">
                         <div>
                             <h2>Observação</h2>
@@ -113,11 +122,15 @@
                         </div>
                     </div>
                     <div class="form-card-body">
-                        <textarea id="campo-observacao" name="observacao" rows="4" placeholder="Digite aqui sua observação…"></textarea>
+                        <textarea id="campo-observacao" name="observacao" rows="4" placeholder="Ex.: concretagem da laje do bloco C, previsão de término às 22h."></textarea>
                     </div>
                 </section>
 
                 <section class="form-card" id="card-resumo-previa" data-step="4">
+                    <div class="form-card-talao">
+                        <span class="form-card-talao-num">04</span>
+                        <span class="form-card-talao-nome">Revisão</span>
+                    </div>
                     <div class="form-card-header">
                         <div>
                             <h2>Revisão antes do envio</h2>
@@ -125,7 +138,7 @@
                         </div>
                     </div>
                     <div class="form-card-body">
-                        <div id="resumo-previa" class="resumo-previa">Preencha o formulário para ver o resumo.</div>
+                        <div id="resumo-previa" class="resumo-previa"></div>
                     </div>
                 </section>
 
@@ -133,6 +146,18 @@
                     <p id="form-erro" class="form-erro" hidden></p>
                 </div>
             </form>
+
+            <aside class="wizard-aside" aria-label="Ficha em andamento">
+                <div class="wizard-aside-titulo">Ficha em andamento</div>
+                <div class="wizard-aside-corpo">
+                    <dl id="wizard-aside-campos"></dl>
+                    <div class="wizard-aside-total">
+                        <strong id="wizard-aside-total">0</strong>
+                        <span id="wizard-aside-total-label">colaboradores marcados</span>
+                    </div>
+                </div>
+            </aside>
+            </div>
         </div>
 
         <div class="wizard-nav">
@@ -148,30 +173,77 @@
         </div>
 </div>
 
+<!-- Seleção em tela cheia: uma função por vez, campo de busca fixo no topo,
+     rodapé que conta e confirma. A tela não fecha a cada toque. -->
+<div class="sheet" id="sheet-colaboradores" role="dialog" aria-modal="true" aria-labelledby="sheet-titulo" hidden>
+    <div class="sheet-topo">
+        <div class="sheet-topo-linha">
+            <div style="min-width:0;">
+                <div class="sheet-titulo" id="sheet-titulo"></div>
+                <div class="sheet-sub" id="sheet-sub"></div>
+            </div>
+            <button type="button" class="sheet-fechar" id="sheet-fechar" aria-label="Fechar seleção">×</button>
+        </div>
+        <input type="search" class="sheet-busca" id="sheet-busca" placeholder="Matrícula ou nome" aria-label="Filtrar por matrícula ou nome">
+    </div>
+    <div class="sheet-corpo" id="sheet-corpo"></div>
+    <div class="sheet-rodape">
+        <div class="sheet-conta"><strong id="sheet-qtd">0</strong> marcados</div>
+        <button type="button" class="btn-primary" id="sheet-confirmar">Concluir</button>
+    </div>
+</div>
+
 <template id="bloco-template">
     <div class="bloco-item bloco-funcao">
-        <div class="bloco-item-top">
-            <span class="bloco-item-badge">Função</span>
-            <div class="bloco-item-top-right">
-                <span class="bloco-item-count">0</span>
-                <button type="button" class="btn-remover-bloco" title="Remover">×</button>
-            </div>
+        <div class="bloco-talao">
+            <span class="bloco-talao-num">01</span>
+            <span class="bloco-talao-nome">Função</span>
+            <span class="bloco-talao-serrilha"></span>
         </div>
-        <div class="bloco-item-body">
-            <div class="bloco-grid">
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Função</label>
-                    <select class="funcao-select" required aria-label="Função">
-                        <option value="">Selecione a função</option>
-                    </select>
+        <div class="bloco-corpo">
+            <div class="bloco-item-top">
+                <div class="bloco-funcao-titulo">
+                    <h3 class="bloco-item-badge-titulo">Função 1</h3>
+                    <p class="bloco-funcao-sub">Marque quem participa de cada função.</p>
                 </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Filtrar colaboradores</label>
-                    <input type="search" class="busca-colab-bloco" placeholder="Matrícula ou nome…" aria-label="Filtrar colaboradores desta função">
+                <button type="button" class="btn-remover-bloco" title="Remover função" aria-label="Remover função">×</button>
+            </div>
+            <div class="bloco-item-body">
+                <div class="bloco-grid">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Função</label>
+                        <select class="funcao-select" required aria-label="Função">
+                            <option value="">Selecione a função</option>
+                        </select>
+                    </div>
+                    <div class="bloco-item-count" aria-live="polite">
+                        <span class="conta">0</span>
+                        <span class="conta-label">colaboradores marcados</span>
+                    </div>
+                </div>
+                <input type="number" class="quantidade-input" hidden readonly value="0" aria-hidden="true" tabindex="-1">
+                <div class="bloco-sem-funcao">Escolha a função para carregar o efetivo habilitado.</div>
+                <div class="picker" hidden>
+                    <div class="picker-toque">
+                        <div class="picker-chips"></div>
+                        <button type="button" class="picker-abrir">Marcar colaboradores</button>
+                    </div>
+                    <div class="picker-mouse">
+                        <div class="picker-lista">
+                            <div class="picker-lista-topo">
+                                <input type="search" class="busca-colab-bloco" placeholder="Filtrar por matrícula ou nome" aria-label="Filtrar colaboradores desta função">
+                                <span class="picker-resultado"></span>
+                                <button type="button" class="picker-marcar-todos">Marcar os filtrados</button>
+                            </div>
+                            <div class="colaboradores-container"></div>
+                        </div>
+                        <div class="picker-marcados">
+                            <div class="picker-marcados-titulo">Marcados nesta função</div>
+                            <div class="picker-marcados-lista"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <input type="number" class="quantidade-input" hidden readonly value="0" aria-hidden="true" tabindex="-1">
-            <div class="colaboradores-container"></div>
         </div>
     </div>
 </template>
@@ -193,7 +265,7 @@
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Operador</label>
                     <div class="combobox" data-role="operador">
-                        <input type="search" class="operador-busca" placeholder="Buscar por matrícula ou nome…" autocomplete="off" aria-label="Buscar operador por matrícula ou nome">
+                        <input type="search" class="operador-busca" placeholder="Matrícula ou nome" autocomplete="off" aria-label="Buscar operador por matrícula ou nome">
                         <input type="hidden" class="operador-valor">
                         <div class="combobox-lista" hidden></div>
                         <div class="combobox-selecionado" hidden></div>

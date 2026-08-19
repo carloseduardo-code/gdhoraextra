@@ -47,30 +47,59 @@ async function carregar(q, data) {
         const dados = await res.json();
         if (!res.ok) throw new Error(dados.error || 'Erro');
 
-        if (countLabel) countLabel.textContent = `${dados.length} registro${dados.length === 1 ? '' : 's'}`;
+        // Depois de carregar, o rótulo vira informação útil em vez de sumir.
+        if (countLabel) {
+            const pessoas = new Set();
+            dados.forEach(sol => (sol.solicitacao_itens || []).forEach(item => {
+                (item.colaboradores || []).forEach(c => pessoas.add(c.matricula || c.nome));
+            }));
+            countLabel.textContent = `${dados.length} ${dados.length === 1 ? 'solicitação' : 'solicitações'}`
+                + ` · ${pessoas.size} ${pessoas.size === 1 ? 'colaborador envolvido' : 'colaboradores envolvidos'}`;
+        }
 
         solsAtuais = new Map(dados.map(s => [String(s.id), s]));
         edicaoAbertaId = null;
 
+        const cabecalho = document.getElementById('sol-lista-cabecalho');
+
         if (!dados.length) {
+            // O vazio é do filtro, não do sistema — e a ação vem junto.
+            if (cabecalho) cabecalho.hidden = true;
+            const alvo = dataAtual
+                ? `Nenhuma solicitação em ${formatarData(dataAtual)}`
+                : (termoAtual ? `Nenhuma solicitação com “${escapar(termoAtual)}”` : 'Nenhuma solicitação registrada');
             box.innerHTML = `
                 <div class="empty-state">
-                    <div class="empty-state-title">Nenhuma solicitação encontrada</div>
-                    <div class="empty-state-hint">Ajuste a busca para ver outros resultados.</div>
+                    <div class="empty-state-title">${alvo}</div>
+                    <div class="empty-state-hint">Troque a data ou limpe o filtro para ver os pedidos das outras datas.</div>
+                    <button type="button" class="btn-secondary" id="btn-limpar-filtros" style="margin-top:14px;">Limpar filtros</button>
                 </div>`;
+            box.querySelector('#btn-limpar-filtros')?.addEventListener('click', () => {
+                const busca = document.getElementById('busca');
+                const filtroData = document.getElementById('filtro-data');
+                const btnLimparData = document.getElementById('btn-limpar-data');
+                if (busca) busca.value = '';
+                if (filtroData) filtroData.value = '';
+                if (btnLimparData) btnLimparData.hidden = true;
+                carregar('', '');
+            });
             return;
         }
+        if (cabecalho) cabecalho.hidden = false;
         box.innerHTML = dados.map(criarLinha).join('');
 
         box.querySelectorAll('.sol-row').forEach(row => {
             const id = row.dataset.id;
             const toggle = row.querySelector('.sol-toggle');
             const body = row.querySelector('.sol-row-body');
-            toggle.addEventListener('click', () => {
+            const alternar = () => {
                 const abrir = body.hidden;
                 body.hidden = !abrir;
                 toggle.classList.toggle('open', abrir);
-            });
+            };
+            toggle.addEventListener('click', e => { e.stopPropagation(); alternar(); });
+            // A linha inteira abre a ficha: é o alvo que o RH mira.
+            row.querySelector('.sol-row-head').addEventListener('click', alternar);
             row.querySelector('.btn-copiar-texto')?.addEventListener('click', () => copiarTexto(row.dataset.texto || ''));
             row.querySelector('.btn-apagar')?.addEventListener('click', () => apagarSolicitacao(id));
             row.querySelector('.btn-editar')?.addEventListener('click', () => alternarEdicao(row, id));
@@ -122,24 +151,24 @@ function criarLinha(sol) {
     `).join('');
 
     return `
-        <div class="sol-row" data-id="${sol.id}" data-texto="${escAttr(resumo)}">
+        <div class="sol-row" data-id="${sol.id}" data-texto="${escAttr(resumo)}" title="${escAttr(titulo)}">
             <div class="sol-row-head">
-                <div class="sol-date-chip"><span class="dia">${escapar(dia)}</span><span class="mes">${escapar(mes)}</span></div>
-                <div class="sol-row-title">
-                    <div class="titulo">${escapar(titulo)}</div>
-                    <div class="sol-row-meta">
-                        <span>${escapar(sol.solicitante || '—')}</span><span class="sep">·</span><span>${escapar(setor)}</span><span class="sep">·</span><span>${escapar(asCode || '—')}</span>
-                    </div>
-                </div>
-                <div class="sol-row-side">
+                <span class="sol-col-data">
+                    <span class="dia">${escapar(dia)}</span><span class="mes">${escapar(mes)}</span>
+                    <span class="data-completa">${escapar(formatarData(sol.data_solicitacao))}</span>
+                    <span class="turno-linha">${escapar(turno)}</span>
+                </span>
+                <span class="sol-col-solicitante">${escapar(sol.solicitante || '—')}</span>
+                <span class="sol-col-setor">${escapar(setor)}</span>
+                <span class="sol-col-as">${escapar(asCode || '—')}</span>
+                <span class="sol-col-pessoas"><span class="chip-count">${qtd}</span></span>
+                <span class="sol-col-acoes">
                     <span class="chip-badge turno ${turnoCss}">${escapar(turno)}</span>
-                    <span class="chip-count">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="9.5" cy="7" r="3.5"></circle><path d="M21 20v-2a4 4 0 0 0-3-3.87"></path></svg>${qtd}
-                    </span>
-                    <button type="button" class="sol-toggle" title="Detalhes">
+                    <span class="chip-count">${qtd}</span>
+                    <button type="button" class="sol-toggle" title="Abrir a ficha" aria-label="Abrir a ficha">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
                     </button>
-                </div>
+                </span>
             </div>
             <div class="sol-row-body" hidden>
                 <div class="sol-row-grid">
@@ -393,7 +422,7 @@ function montarComboboxSolicitante(valorInicial) {
     wrap.dataset.campo = 'solicitante';
     const temValor = !!valorInicial;
     wrap.innerHTML = `
-        <input type="search" class="combobox-input" placeholder="Pesquisar por matrícula ou nome..." autocomplete="off">
+        <input type="search" class="combobox-input" placeholder="Matrícula ou nome" autocomplete="off">
         <input type="hidden" value="${escAttr(valorInicial || '')}">
         <div class="combobox-lista" hidden></div>
         <div class="combobox-selecionado" ${temValor ? '' : 'hidden'}>${temValor ? `<span>${escapar(valorInicial)}</span><button type="button" class="btn-x-mini" title="Limpar">×</button>` : ''}</div>
@@ -515,7 +544,18 @@ async function carregarColaboradoresEdicao(funcao, container, qtdInput, bloco, s
             if (jaSelecionados.has(`${col.matricula}|${col.nome}`)) checkbox.checked = true;
             checkbox.addEventListener('change', () => atualizarQuantidadeBloco(container, qtdInput, bloco));
             label.appendChild(checkbox);
-            label.appendChild(document.createTextNode(` ${col.matricula} - ${col.nome}`));
+
+            // A matrícula fica sempre visível: homônimos só se distinguem por ela.
+            const matricula = document.createElement('span');
+            matricula.className = 'colab-matricula';
+            matricula.textContent = col.matricula || '';
+            label.appendChild(matricula);
+
+            const nome = document.createElement('span');
+            nome.className = 'colab-nome';
+            nome.textContent = col.nome || '';
+            label.appendChild(nome);
+
             container.appendChild(label);
         });
         atualizarQuantidadeBloco(container, qtdInput, bloco);
@@ -527,8 +567,13 @@ async function carregarColaboradoresEdicao(funcao, container, qtdInput, bloco, s
 function atualizarQuantidadeBloco(container, qtdInput, bloco) {
     const checked = container.querySelectorAll('input[type="checkbox"]:checked').length;
     qtdInput.value = checked;
-    const badge = bloco.querySelector('.bloco-item-count');
-    if (badge) badge.textContent = checked;
+    const caixa = bloco.querySelector('.bloco-item-count');
+    if (!caixa) return;
+    caixa.classList.toggle('tem-gente', checked > 0);
+    const conta = caixa.querySelector('.conta');
+    const label = caixa.querySelector('.conta-label');
+    if (conta) conta.textContent = checked;
+    if (label) label.textContent = checked === 1 ? 'colaborador marcado' : 'colaboradores marcados';
 }
 
 function filtrarColaboradoresBlocoEdicao(container, q) {
@@ -545,8 +590,11 @@ function adicionarBlocoEdicao(container, itemExistente) {
     const template = document.getElementById('admin-bloco-template');
     const clone = template.content.cloneNode(true);
     const bloco = clone.querySelector('.bloco-funcao');
+    const ordem = container.querySelectorAll('.bloco-funcao').length + 1;
     const badge = bloco.querySelector('.bloco-item-badge');
-    if (badge) badge.textContent = `Função ${container.querySelectorAll('.bloco-funcao').length + 1}`;
+    if (badge) badge.textContent = `Função ${ordem}`;
+    const num = bloco.querySelector('.bloco-talao-num');
+    if (num) num.textContent = String(ordem).padStart(2, '0');
 
     const select = bloco.querySelector('.funcao-select');
     const qtdInput = bloco.querySelector('.quantidade-input');
