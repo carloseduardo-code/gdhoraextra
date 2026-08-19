@@ -23,8 +23,8 @@
     --txt-corpo:      #3A443D;
     --txt-label:      #4A544D;
     --txt-apoio:      #5C6660;
-    --txt-fraco:      #7C857E;
-    --txt-talao:      #8A928A;
+    --txt-fraco:      #656E68;
+    --txt-talao:      #656E68;
     --txt-invertido:  #EAF2ED;
 
     /* ---- ação ---- */
@@ -132,7 +132,7 @@
     --txt-label:      #B0BCB5;
     --txt-apoio:      #9CA8A1;
     --txt-fraco:      #8A958E;
-    --txt-talao:      #79847D;
+    --txt-talao:      #9AA49D;
     --txt-invertido:  #E7EFEA;
 
     --acao:           #74CFA0;
@@ -904,7 +904,7 @@ h2 {
 .campo-hint {
     margin-top: 5px;
     font-size: 12px;
-    color: var(--txt-fraco);
+    color: var(--txt-apoio);
 }
 
 label {
@@ -1432,7 +1432,7 @@ select.invalido, input.invalido, textarea.invalido {
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: .08em;
-    color: var(--txt-fraco);
+    color: var(--txt-label);
 }
 
 .wizard-aside-linha dd {
@@ -1688,9 +1688,9 @@ select.invalido, input.invalido, textarea.invalido {
 .searchable-input:focus,
 .combobox-input:focus,
 .operador-busca:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .12);
+    outline: 2px solid var(--acao);
+    outline-offset: 1px;
+    border-color: var(--acao);
 }
 
 .searchable-list,
@@ -1950,7 +1950,8 @@ select.invalido, input.invalido, textarea.invalido {
     font-weight: 800;
     font-size: 20px;
     line-height: 1;
-    color: var(--box-borda);
+    /* Zero tambem e um numero que se le: tom de apoio, nao cor de borda. */
+    color: var(--txt-apoio);
     font-variant-numeric: tabular-nums;
 }
 
@@ -2401,7 +2402,7 @@ select.invalido, input.invalido, textarea.invalido {
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: .12em;
-    color: var(--txt-fraco);
+    color: var(--txt-label);
 }
 
 .ficha-dl dd {
@@ -2594,6 +2595,7 @@ select.invalido, input.invalido, textarea.invalido {
 
 .resumo-block {
     background: var(--barra);
+    color: var(--sobre-barra);
     border-radius: var(--raio-ficha);
     overflow: hidden;
     margin: 20px 0;
@@ -3115,7 +3117,7 @@ select.invalido, input.invalido, textarea.invalido {
     font-weight: 700;
     letter-spacing: .1em;
     text-transform: uppercase;
-    color: var(--txt-fraco);
+    color: var(--txt-label);
 }
 
 .sol-col-data .data-completa,
