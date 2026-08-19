@@ -2,7 +2,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ page_title or 'Hora Extra' }}</title>
 <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+<meta name="theme-color" content="#E8E9E5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121815" media="(prefers-color-scheme: dark)">
+<script>
+/* Tema aplicado antes da primeira pintura, para não piscar branco. */
+(function () {
+    try {
+        var t = localStorage.getItem('he-tema');
+        if (t !== 'dia' && t !== 'noite') {
+            t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'noite' : 'dia';
+        }
+        document.documentElement.setAttribute('data-tema', t);
+    } catch (e) {
+        document.documentElement.setAttribute('data-tema', 'dia');
+    }
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Instrument+Sans:wght@400..700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="{{ url_for('static', filename='tema.js') }}" defer></script>

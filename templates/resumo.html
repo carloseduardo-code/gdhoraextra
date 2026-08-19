@@ -5,38 +5,82 @@
 {% include "_head.html" %}
 </head>
 <body>
-<div class="container">
-    <div class="page-header">
-        <div class="logo-brand">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="Gonçalves & Dias">
-            <div>
-                <h1>Solicitação enviada</h1>
-                <p class="home-subtitle">Copie o texto abaixo e compartilhe com sua equipe.</p>
-            </div>
+<div class="hero-shell">
+    <header class="hero-topbar">
+        <div class="hero-brand">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Gonçalves &amp; Dias">
+            <span class="hero-divider"></span>
+            <span class="hero-brand-name">Hora Extra</span>
         </div>
-        <a href="{{ url_for('index') }}" class="btn-nav">Início</a>
-    </div>
-
-    <div class="resumo-block">
-        <div class="resumo-block-head">
-            <span class="resumo-panel-label">Resumo</span>
-            <button type="button" class="btn-copiar" id="btn-copiar">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"></rect><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3H6.5A2.5 2.5 0 0 0 4 5.5v6A2.5 2.5 0 0 0 6.5 14"></path></svg>
-                <span id="btn-copiar-label">Copiar</span>
+        <div class="hero-topbar-acoes">
+            <button type="button" class="btn-tema" data-tema-toggle>
+                <span class="btn-tema-disco"></span><span data-tema-texto>Noite</span>
             </button>
         </div>
-        <pre id="resumo-texto">Carregando...</pre>
-    </div>
+    </header>
 
-    <div class="acoes-resumo">
-        <a href="{{ url_for('solicitacao') }}" class="btn-primary">Nova solicitação</a>
-        <a href="{{ url_for('index') }}" class="btn-secondary" style="text-align:center;">Início</a>
-    </div>
-    <p id="copiar-status" class="status-inline"></p>
+    <main class="hero-main">
+        <div class="hero-inner" style="max-width:640px;">
+            <!-- Encerramento com prova: o encarregado sai da tela com um número
+                 para citar, e o carimbo é o que ele costuma fotografar. -->
+            <div class="envio-ficha">
+                <div class="envio-carimbo" aria-hidden="true">
+                    <div class="envio-carimbo-titulo">Enviada</div>
+                    <div class="envio-carimbo-data" id="carimbo-data">—</div>
+                </div>
+                <div class="envio-rotulo">Protocolo</div>
+                <div class="envio-protocolo" id="protocolo">—</div>
+                <p class="envio-texto">A gestão já recebeu a solicitação. Guarde o protocolo: é por ele que o RH localiza o pedido.</p>
+                <dl class="ficha-dl" id="envio-campos" style="margin-top:20px;"></dl>
+            </div>
+
+            <div class="resumo-block">
+                <div class="resumo-block-head">
+                    <span class="resumo-panel-label">Texto para compartilhar</span>
+                    <button type="button" class="btn-copiar" id="btn-copiar">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"></rect><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3H6.5A2.5 2.5 0 0 0 4 5.5v6A2.5 2.5 0 0 0 6.5 14"></path></svg>
+                        <span id="btn-copiar-label">Copiar</span>
+                    </button>
+                </div>
+                <pre id="resumo-texto">Carregando…</pre>
+            </div>
+
+            <div class="acoes-resumo">
+                <a href="{{ url_for('solicitacao') }}" class="btn-primary">Enviar outra solicitação</a>
+                <a href="{{ url_for('index') }}" class="btn-secondary" style="text-align:center;">Voltar ao início</a>
+            </div>
+            <p id="copiar-status" class="status-inline" role="status"></p>
+        </div>
+    </main>
 </div>
 
 <script>
 const SOL_ID = {{ solicitacao_id }};
+
+function esc(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function dataBr(iso) {
+    if (!iso) return '';
+    const p = String(iso).slice(0, 10).split('-');
+    return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+}
+
+/* Protocolo derivado do que já existe: ano, dia do envio e o id da ficha. */
+function montarProtocolo(data) {
+    const d = new Date(data.criado_em || Date.now());
+    const ano = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `HE-${ano}-${mm}${dd}-${String(data.id).padStart(3, '0')}`;
+}
+
+function carimbo(data) {
+    const d = new Date(data.criado_em || Date.now());
+    const dois = n => String(n).padStart(2, '0');
+    return `${dois(d.getDate())}/${dois(d.getMonth() + 1)}/${d.getFullYear()} · ${dois(d.getHours())}:${dois(d.getMinutes())}`;
+}
 
 async function carregar() {
     const pre = document.getElementById('resumo-texto');
@@ -44,9 +88,28 @@ async function carregar() {
         const res = await fetch('/api/solicitacoes/' + SOL_ID);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Erro');
+
         pre.textContent = data.resumo_texto || '(sem resumo)';
+        document.getElementById('protocolo').textContent = montarProtocolo(data);
+        document.getElementById('carimbo-data').textContent = carimbo(data);
+
+        const itens = data.solicitacao_itens || [];
+        const pessoas = new Set();
+        itens.forEach(it => (it.colaboradores || []).forEach(c => pessoas.add(c.matricula || c.nome)));
+
+        const campos = [
+            ['Solicitante', data.solicitante],
+            ['Setor', data.setor_solicitante],
+            ['AS', data.as_code],
+            ['Data', dataBr(data.data_solicitacao)],
+            ['Turno', data.turno],
+            ['Pessoas', String(pessoas.size)],
+        ];
+        document.getElementById('envio-campos').innerHTML = campos
+            .map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v || '—')}</dd></div>`)
+            .join('');
     } catch (e) {
-        pre.textContent = 'Erro ao carregar resumo.';
+        pre.textContent = 'Não foi possível carregar o resumo. A solicitação foi enviada — recarregue a página para ver o texto.';
     }
 }
 
@@ -64,7 +127,7 @@ document.getElementById('btn-copiar').addEventListener('click', async () => {
         sel.addRange(range);
         document.execCommand('copy');
     }
-    status.textContent = 'Copiado!';
+    status.textContent = 'Texto copiado.';
     label.textContent = 'Copiado';
     setTimeout(() => { label.textContent = 'Copiar'; }, 1800);
 });
