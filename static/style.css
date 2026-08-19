@@ -18,6 +18,15 @@
     --sobre-barra:    #EAF2ED;
     --sobre-barra2:   #C7D6CD;
 
+    /* ---- cromo do admin e do acesso (segue o tema) ---- */
+    --chrome:         #FFFFFF;
+    --chrome-borda:   #CFD2CB;
+    --chrome-hover:   #F1F4F1;
+    --chrome-tinta:   #16201C;
+    --chrome-texto:   #4A544D;
+    --chrome-fraco:   #5C6660;
+    --acesso-fundo:   #E8E9E5;
+
     /* ---- texto ---- */
     --tinta:          #16201C;
     --txt-corpo:      #3A443D;
@@ -126,6 +135,14 @@
     --barra-fraco:    #8FA79A;
     --sobre-barra:    #E7EFEA;
     --sobre-barra2:   #B9C9C0;
+
+    --chrome:         #0C110F;
+    --chrome-borda:   #2E3A34;
+    --chrome-hover:   #1F2A25;
+    --chrome-tinta:   #E7EFEA;
+    --chrome-texto:   #B9C9C0;
+    --chrome-fraco:   #8FA79A;
+    --acesso-fundo:   #121815;
 
     --tinta:          #E7EFEA;
     --txt-corpo:      #C6D1CB;
@@ -574,21 +591,21 @@ h2 {
     }
 }
 
-/* Sobre a barra grafite do admin o mesmo botao fica vazado. */
+/* Sobre o cromo do admin o mesmo botao fica vazado. */
 .btn-tema.sobre-escuro {
     background: transparent;
-    border-color: var(--barra-borda);
-    color: var(--sobre-barra2);
+    border-color: var(--chrome-borda);
+    color: var(--chrome-texto);
 }
 
 .btn-tema.sobre-escuro .btn-tema-disco {
-    box-shadow: inset -3.5px 0 0 var(--barra);
+    box-shadow: inset -3.5px 0 0 var(--chrome);
 }
 
 @media (hover: hover) {
     .btn-tema.sobre-escuro:hover {
-        background: var(--barra-hover);
-        border-color: var(--barra-borda);
+        background: var(--chrome-hover);
+        border-color: var(--chrome-borda);
     }
 }
 
@@ -2596,6 +2613,9 @@ select.invalido, input.invalido, textarea.invalido {
 .resumo-block {
     background: var(--barra);
     color: var(--sobre-barra);
+    /* No tema noite a faixa quase encosta no fundo da pagina; o contorno e o
+       que a mantem lendo como painel nos dois temas. */
+    border: 1px solid var(--barra-borda);
     border-radius: var(--raio-ficha);
     overflow: hidden;
     margin: 20px 0;
@@ -2803,13 +2823,13 @@ select.invalido, input.invalido, textarea.invalido {
 }
 
 /* ---------- Tela de login (público e admin) ---------- */
-/* Fundo grafite separa o mundo do RH do mundo do canteiro. */
+/* O acesso usa a mesma superficie do resto do sistema, em cada tema. */
 .auth-shell {
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--barra);
+    background: var(--acesso-fundo);
     padding: 20px 16px;
 }
 
@@ -2886,11 +2906,11 @@ select.invalido, input.invalido, textarea.invalido {
 .auth-aviso {
     margin: 0 0 14px;
     padding: 12px 14px;
-    border: 1px solid #6B5A2A;
+    border: 1px solid var(--aten-borda);
     border-left: 4px solid var(--aten);
     border-radius: var(--raio);
-    background: #241F14;
-    color: #F0E3C8;
+    background: var(--aten-fundo);
+    color: var(--txt-corpo);
     font-size: 13.5px;
     text-wrap: pretty;
 }
@@ -2898,7 +2918,7 @@ select.invalido, input.invalido, textarea.invalido {
 .auth-aviso strong {
     display: block;
     font-size: 14px;
-    color: #F5D98F;
+    color: var(--aten-txt);
 }
 
 @media (min-width: 700px) {
@@ -3745,9 +3765,9 @@ select.invalido, input.invalido, textarea.invalido {
 .admin-sidebar {
     flex: none;
     width: 248px;
-    background: var(--barra);
-    color: var(--sobre-barra);
-    border-right: 1px solid var(--barra-borda);
+    background: var(--chrome);
+    color: var(--chrome-tinta);
+    border-right: 1px solid var(--chrome-borda);
     display: flex;
     flex-direction: column;
     padding: 22px 14px 18px;
@@ -3775,7 +3795,7 @@ select.invalido, input.invalido, textarea.invalido {
     flex: none;
     width: 1px;
     height: 20px;
-    background: var(--barra-borda);
+    background: var(--chrome-borda);
 }
 
 .admin-brand-title {
@@ -3803,22 +3823,22 @@ select.invalido, input.invalido, textarea.invalido {
     border-radius: 0 var(--raio) var(--raio) 0;
     font-size: 14px;
     font-weight: 500;
-    color: var(--sobre-barra2);
+    color: var(--chrome-texto);
     text-decoration: none;
     transition: background .15s, color .15s;
 }
 
 @media (hover: hover) {
     .admin-nav-item:hover {
-        background: var(--barra-hover);
-        color: var(--sobre-barra);
+        background: var(--chrome-hover);
+        color: var(--chrome-tinta);
     }
 }
 
 .admin-nav-item.active {
-    background: var(--barra-hover);
-    border-left-color: #74CFA0;
-    color: #fff;
+    background: var(--acao-suave);
+    border-left-color: var(--acao);
+    color: var(--acao-forte);
     font-weight: 600;
 }
 
@@ -3828,7 +3848,7 @@ select.invalido, input.invalido, textarea.invalido {
     flex-direction: column;
     gap: 6px;
     padding-top: 16px;
-    border-top: 1px solid var(--barra-borda);
+    border-top: 1px solid var(--chrome-borda);
 }
 
 .admin-sidebar-footer .btn-tema {
@@ -3849,14 +3869,14 @@ select.invalido, input.invalido, textarea.invalido {
     padding: 8px 10px;
     border-radius: var(--raio);
     font-size: 13px;
-    color: var(--barra-fraco);
+    color: var(--chrome-fraco);
     text-decoration: none;
 }
 
 @media (hover: hover) {
     .admin-sidebar-link:hover {
-        background: var(--barra-hover);
-        color: var(--sobre-barra);
+        background: var(--chrome-hover);
+        color: var(--chrome-tinta);
     }
 }
 
@@ -3865,7 +3885,7 @@ select.invalido, input.invalido, textarea.invalido {
     align-items: center;
     gap: 8px;
     padding: 5px 11px 5px 5px;
-    border: 1px solid var(--barra-borda);
+    border: 1px solid var(--chrome-borda);
     border-radius: var(--raio);
     background: transparent;
 }
@@ -3890,7 +3910,7 @@ select.invalido, input.invalido, textarea.invalido {
     min-width: 0;
     font-size: 13px;
     font-weight: 500;
-    color: var(--sobre-barra2);
+    color: var(--chrome-texto);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -3923,9 +3943,9 @@ select.invalido, input.invalido, textarea.invalido {
         justify-content: space-between;
         gap: 12px;
         padding: 12px 16px;
-        background: var(--barra);
-        color: var(--sobre-barra);
-        border-bottom: 1px solid var(--barra-borda);
+        background: var(--chrome);
+        color: var(--chrome-tinta);
+        border-bottom: 1px solid var(--chrome-borda);
         position: sticky;
         top: 0;
         z-index: 5;
