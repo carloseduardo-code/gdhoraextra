@@ -4372,7 +4372,7 @@ select.invalido, input.invalido, textarea.invalido {
 
 .dash-card-flat .table-card,
 .dash-card-flat .dash-card {
-    padding: 0;
+    padding: 20;
 }
 
 .quick-links {
