@@ -6,6 +6,7 @@
 <body>
 {% set tabs = [
     ('admin_home', url_for('admin_home'), 'Visão geral'),
+    ('admin_horas_extras', url_for('admin_horas_extras'), 'Horas extras'),
     ('admin_solicitacoes', url_for('admin_solicitacoes'), 'Solicitações'),
     ('admin_efetivo', url_for('admin_efetivo'), 'Efetivo'),
     ('admin_config', url_for('admin_config'), 'Configuração'),
@@ -67,12 +68,13 @@
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"></circle><path d="M3.5 19c.6-3 2.9-4.6 5.5-4.6S13.9 16 14.5 19M17 11h4M17 15h4"></path></svg>
             Efetivo
         </a>
-        <button type="button" class="admin-bottom-nav-item{{ ' active' if request.endpoint in ['admin_config', 'admin_usuarios', 'admin_auditoria'] else '' }}" id="btn-admin-mais">
+        <button type="button" class="admin-bottom-nav-item{{ ' active' if request.endpoint in ['admin_horas_extras', 'admin_config', 'admin_usuarios', 'admin_auditoria'] else '' }}" id="btn-admin-mais">
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle></svg>
             Mais
         </button>
     </nav>
     <div class="admin-more-menu" id="admin-more-menu" hidden>
+        <a href="{{ url_for('admin_horas_extras') }}"{{ ' class="active"'|safe if request.endpoint == 'admin_horas_extras' else '' }}>Horas extras</a>
         <a href="{{ url_for('admin_config') }}"{{ ' class="active"'|safe if request.endpoint == 'admin_config' else '' }}>Configuração</a>
         <a href="{{ url_for('admin_usuarios') }}"{{ ' class="active"'|safe if request.endpoint == 'admin_usuarios' else '' }}>Usuários</a>
         <a href="{{ url_for('admin_auditoria') }}"{{ ' class="active"'|safe if request.endpoint == 'admin_auditoria' else '' }}>Auditoria</a>

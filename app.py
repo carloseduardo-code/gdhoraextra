@@ -3,7 +3,7 @@ import json
 import re
 import time
 import unicodedata
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from functools import wraps
 from io import BytesIO
 import base64
@@ -800,6 +800,191 @@ def admin_home():
         "admin/index.html",
         user=usuario_logado(),
         dash=calcular_metricas_dashboard(periodo, dia),
+    )
+
+
+TETO_HORAS_GERAL = 40
+TETO_HORAS_MOTORISTA = 80
+FUNCOES_SEM_REINCIDENCIA = {"analista", "engenheiro", "supervisor", "encarregado"}
+
+
+def _add_meses(ano, mes, delta):
+    idx = (ano * 12 + (mes - 1)) + delta
+    return idx // 12, idx % 12 + 1
+
+
+def ciclo_ponto(offset=0):
+    """Ciclo de ponto: 21 de um mês até 20 do mês seguinte.
+    offset=0 é o ciclo aberto (o que contém hoje); offset negativo volta ciclos."""
+    hoje = datetime.now().date()
+    if hoje.day >= 21:
+        ano_ini, mes_ini = hoje.year, hoje.month
+    else:
+        ano_ini, mes_ini = _add_meses(hoje.year, hoje.month, -1)
+    ano_ini, mes_ini = _add_meses(ano_ini, mes_ini, offset)
+    inicio = date(ano_ini, mes_ini, 21)
+    ano_fim, mes_fim = _add_meses(ano_ini, mes_ini, 1)
+    fim = date(ano_fim, mes_fim, 20)
+    return inicio, fim
+
+
+def _situacao_colaborador(restam):
+    if restam < 0:
+        return "acima", f"Acima {abs(restam)} h"
+    if restam == 0:
+        return "no_limite", "No limite"
+    if restam <= 5:
+        return "proximo", f"Próximo · {restam} h"
+    return "dentro", "Dentro"
+
+
+def calcular_horas_extras(offset=0):
+    """Horas acumuladas por colaborador no ciclo de ponto, contra o teto
+    individual (40 h geral, 80 h motorista). Reaproveita horas_do_turno() e
+    a mesma regra de deduplicação por pedido de calcular_metricas_dashboard,
+    só que por pessoa em vez de agregado."""
+    inicio, fim = ciclo_ponto(offset)
+    vazio = {
+        "inicio": inicio, "fim": fim,
+        "inicio_br": inicio.strftime("%d/%m/%Y"), "fim_br": fim.strftime("%d/%m/%Y"),
+        "dias_restantes": None,
+        "total_horas": 0, "total_horas_fmt": "0", "total_colaboradores": 0, "media": 0, "media_fmt": "0",
+        "n_dentro": 0, "n_proximo": 0, "n_no_limite": 0, "n_acima": 0,
+        "excedente_total": 0, "em_risco": 0,
+        "linhas": [], "top_solicitados": [], "offset": offset,
+    }
+    if supabase is None:
+        return vazio
+
+    chave_cache = f"horas_extras_ciclo:{offset}"
+    cached = cache_get(chave_cache)
+    if cached is not None:
+        return cached
+
+    try:
+        res = (
+            supabase.table("solicitacoes")
+            .select("id, data_solicitacao, turno, solicitacao_itens(funcao, colaboradores)")
+            .execute()
+        )
+        dados = res.data or []
+    except Exception:
+        return vazio
+
+    funcionarios = {f["matricula"]: f for f in carregar_funcionarios() if f.get("matricula")}
+
+    horas = {}
+    pedidos = {}
+    nomes = {}
+
+    for sol in dados:
+        try:
+            data_sol = date.fromisoformat(str(sol.get("data_solicitacao"))[:10])
+        except (TypeError, ValueError):
+            continue
+        if not (inicio <= data_sol <= fim):
+            continue
+
+        h = horas_do_turno(sol.get("turno") or "Dia")
+        sol_id = sol.get("id")
+        vistos = set()
+        for it in sol.get("solicitacao_itens") or []:
+            for c in (it.get("colaboradores") or []):
+                mat = str(c.get("matricula") or "").strip()
+                if not mat or c.get("a_procura"):
+                    continue
+                nomes.setdefault(mat, c.get("nome") or mat)
+                if mat not in vistos:
+                    vistos.add(mat)
+                    horas[mat] = horas.get(mat, 0) + h
+                pedidos.setdefault(mat, set()).add(sol_id)
+
+    linhas = []
+    for mat, h_acum in horas.items():
+        info = funcionarios.get(mat, {})
+        funcao = (info.get("funcao") or "—").strip() or "—"
+        nome = info.get("nome") or nomes.get(mat) or mat
+        teto = TETO_HORAS_MOTORISTA if funcao.lower() == "motorista" else TETO_HORAS_GERAL
+        restam = teto - h_acum
+        situacao, situacao_label = _situacao_colaborador(restam)
+        linhas.append({
+            "matricula": mat,
+            "nome": nome,
+            "funcao": funcao,
+            "acumulado": h_acum,
+            "teto": teto,
+            "restam": restam,
+            "pct": min(100, round(h_acum / teto * 100)) if teto else 0,
+            "situacao": situacao,
+            "situacao_label": situacao_label,
+            "solicitacoes": len(pedidos.get(mat, ())),
+        })
+
+    linhas.sort(key=lambda r: (r["restam"], -r["acumulado"]))
+
+    total_colab = len(linhas)
+    total_horas = sum(r["acumulado"] for r in linhas)
+    media = round(total_horas / total_colab, 1) if total_colab else 0
+
+    n_dentro = sum(1 for r in linhas if r["situacao"] == "dentro")
+    n_proximo = sum(1 for r in linhas if r["situacao"] == "proximo")
+    n_no_limite = sum(1 for r in linhas if r["situacao"] == "no_limite")
+    n_acima = sum(1 for r in linhas if r["situacao"] == "acima")
+    excedente_total = sum(-r["restam"] for r in linhas if r["situacao"] == "acima")
+
+    top_solicitados = sorted(
+        (r for r in linhas if r["funcao"].lower() not in FUNCOES_SEM_REINCIDENCIA and r["solicitacoes"] > 1),
+        key=lambda r: r["solicitacoes"],
+        reverse=True,
+    )[:6]
+
+    hoje = datetime.now().date()
+    dias_restantes = (fim - hoje).days if inicio <= hoje <= fim else None
+
+    resultado = {
+        "inicio": inicio, "fim": fim,
+        "inicio_br": inicio.strftime("%d/%m/%Y"), "fim_br": fim.strftime("%d/%m/%Y"),
+        "dias_restantes": dias_restantes,
+        "total_horas": total_horas,
+        "total_horas_fmt": f"{total_horas:,}".replace(",", "."),
+        "total_colaboradores": total_colab,
+        "media": media,
+        "media_fmt": f"{media:.1f}".replace(".", ","),
+        "n_dentro": n_dentro, "n_proximo": n_proximo, "n_no_limite": n_no_limite, "n_acima": n_acima,
+        "excedente_total": excedente_total,
+        "em_risco": n_proximo + n_no_limite + n_acima,
+        "linhas": linhas,
+        "top_solicitados": top_solicitados,
+        "offset": offset,
+    }
+    cache_set(chave_cache, resultado, ttl=30)
+    return resultado
+
+
+@app.route("/admin/horas-extras")
+@admin_required
+def admin_horas_extras():
+    try:
+        offset = int(request.args.get("ciclo", 0))
+    except ValueError:
+        offset = 0
+    filtro = (request.args.get("filtro") or "risco").strip()
+    horas = calcular_horas_extras(offset)
+
+    if filtro == "motoristas":
+        linhas = [r for r in horas["linhas"] if r["funcao"].lower() == "motorista"]
+    elif filtro == "todos":
+        linhas = horas["linhas"]
+    else:
+        filtro = "risco"
+        linhas = [r for r in horas["linhas"] if r["situacao"] != "dentro"]
+
+    return render_template(
+        "admin/horas_extras.html",
+        user=usuario_logado(),
+        horas=horas,
+        linhas=linhas[:30],
+        filtro=filtro,
     )
 
 

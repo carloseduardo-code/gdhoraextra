@@ -4543,6 +4543,309 @@ select.invalido, input.invalido, textarea.invalido {
     color: var(--faint);
 }
 
+/* ---------- Horas extras (teto individual por ciclo de ponto) ---------- */
+.he-sub strong {
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.he-top-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.he-banda {
+    background: var(--dark);
+    border-radius: var(--radius-lg);
+    padding: 24px 28px;
+    margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: auto 1px 1fr;
+    gap: 30px;
+    align-items: center;
+}
+
+.he-banda-label {
+    font-family: var(--fonte-display);
+    font-variation-settings: 'wdth' 70;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--dark-muted);
+}
+
+.he-banda-num {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.he-banda-valor {
+    font-family: var(--fonte-display);
+    font-variation-settings: 'wdth' 62;
+    font-weight: 800;
+    font-size: clamp(46px, 5vw, 68px);
+    line-height: .85;
+    color: var(--dark-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.he-banda-unid {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--sobre-barra2);
+}
+
+.he-banda-meta {
+    margin-top: 12px;
+    font-size: 12.5px;
+    color: var(--dark-muted);
+}
+
+.he-banda-div {
+    background: var(--barra-borda);
+    height: 100%;
+}
+
+.he-banda-cols {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+.he-banda-sub {
+    font-size: 12px;
+    color: var(--dark-muted);
+}
+
+.he-banda-num2 {
+    font-family: var(--fonte-display);
+    font-variation-settings: 'wdth' 66;
+    font-weight: 800;
+    font-size: 32px;
+    line-height: 1.15;
+    color: var(--dark-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.he-banda-hint {
+    font-size: 11.5px;
+    color: var(--barra-fraco);
+}
+
+.he-card {
+    margin-bottom: 12px;
+}
+
+.he-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 22px 14px;
+}
+
+.he-card-head h2 {
+    font-size: 15px;
+}
+
+.he-card-head .he-hint {
+    font-size: 11.5px;
+    color: var(--faint);
+}
+
+.he-filtros {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.he-filtros a {
+    font-size: 12.5px;
+    color: var(--muted);
+}
+
+.he-filtros a.active {
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.he-row {
+    display: grid;
+    grid-template-columns: 1fr 130px 300px 100px 130px;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 22px;
+    border-bottom: 1px solid var(--border-2);
+}
+
+.he-row:last-of-type {
+    border-bottom: none;
+}
+
+.he-row-head {
+    background: var(--bg-subtle);
+    border-top: 1px solid var(--border-2);
+    font-family: var(--fonte-display);
+    font-variation-settings: 'wdth' 70;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--muted);
+    padding: 8px 22px;
+}
+
+.he-row-head .he-col-restam,
+.he-row-head .he-col-situacao {
+    text-align: right;
+}
+
+.he-nome {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.he-mat {
+    margin-top: 2px;
+    font-size: 11.5px;
+    color: var(--faint);
+}
+
+.he-funcao {
+    font-size: 12.5px;
+    color: var(--label);
+}
+
+.he-barra-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.he-barra-num {
+    flex: none;
+    width: 74px;
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.he-barra-track {
+    flex: 1;
+    height: 6px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-subtle);
+    overflow: hidden;
+}
+
+.he-barra-fill {
+    height: 6px;
+}
+
+.he-fill-dentro { background: var(--primary); }
+.he-fill-proximo { background: var(--warning-solid); }
+.he-fill-no_limite { background: var(--dark); }
+.he-fill-acima { background: var(--danger); }
+
+.he-restam {
+    text-align: right;
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+}
+
+.he-restam-dentro { color: var(--muted); }
+.he-restam-proximo { color: var(--warning); font-weight: 600; }
+.he-restam-no_limite { color: var(--ink); font-weight: 600; }
+.he-restam-acima { color: var(--danger); font-weight: 600; }
+
+.he-situacao {
+    text-align: right;
+    font-size: 12px;
+}
+
+.he-situacao-dentro { color: var(--muted); }
+.he-situacao-proximo { color: var(--warning); font-weight: 600; }
+.he-situacao-no_limite { color: var(--ink); font-weight: 600; }
+.he-situacao-acima { color: var(--danger); font-weight: 600; }
+
+.he-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 22px;
+    font-size: 12px;
+    color: var(--faint);
+}
+
+.he-repetidos-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 32px;
+    padding: 0 22px 20px;
+}
+
+.he-repetido-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--border-2);
+    font-size: 12.5px;
+}
+
+.he-repetido-funcao {
+    color: var(--faint);
+}
+
+.he-repetido-count {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+    .he-banda {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+    .he-banda-div {
+        display: none;
+    }
+    .he-banda-cols {
+        gap: 12px;
+    }
+    .he-repetidos-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .he-row:not(.he-row-head) {
+        grid-template-columns: 1fr;
+        row-gap: 6px;
+        padding: 14px 16px;
+    }
+    .he-row-head {
+        display: none;
+    }
+    .he-col-funcao::before {
+        content: "Função · ";
+        color: var(--faint);
+    }
+    .he-restam,
+    .he-situacao {
+        text-align: left;
+    }
+}
+
 /* ---------- Responsivo ---------- */
 @media (max-width: 640px) {
     .container {
