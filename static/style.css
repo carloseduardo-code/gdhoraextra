@@ -4096,6 +4096,135 @@ select.invalido, input.invalido, textarea.invalido {
 }
 
 /* ---------- Dashboard ---------- */
+/* Filtro: os periodos a esquerda, o dia especifico a direita. */
+.dash-filtro {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    background: var(--ficha);
+    border: 1px solid var(--borda);
+    border-radius: var(--raio-ficha);
+}
+
+.dash-filtro-periodos {
+    display: flex;
+    gap: 4px;
+    padding: 3px;
+    background: var(--inerte);
+    border: 1px solid var(--borda2);
+    border-radius: var(--raio);
+}
+
+.dash-perido-btn {
+    min-height: 44px;
+    padding: 0 14px;
+    border: none;
+    border-radius: var(--raio-eti);
+    background: transparent;
+    color: var(--txt-label);
+    font-family: var(--fonte-display);
+    font-variation-settings: 'wdth' 70;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+}
+
+@media (hover: hover) {
+    .dash-perido-btn:hover { color: var(--tinta); }
+}
+
+.dash-perido-btn.ativo {
+    background: var(--acao-bg);
+    color: #fff;
+}
+
+.dash-filtro-dia {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.dash-filtro-dia label {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.dash-filtro-dia input[type="date"] {
+    width: auto;
+    min-width: 170px;
+    min-height: 44px;
+    border-bottom-width: 1px;
+}
+
+.dash-filtro-limpar {
+    min-height: 44px;
+    padding: 0 14px;
+    font-size: 13px;
+}
+
+/* Horas: o numero grande e a conta que o gerou, lado a lado. */
+.horas-total {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: var(--acao-suave);
+    border: 1px solid var(--acao-borda);
+    border-radius: var(--raio);
+}
+
+.horas-total-valor {
+    font-family: var(--fonte-display);
+    font-variation-settings: 'wdth' 62;
+    font-weight: 800;
+    font-size: 34px;
+    line-height: 1;
+    color: var(--acao-forte);
+    font-variant-numeric: tabular-nums;
+}
+
+.horas-total-hint {
+    font-size: 13px;
+    color: var(--txt-label);
+}
+
+.horas-conta {
+    margin-top: 5px;
+    font-family: var(--fonte-display);
+    font-variation-settings: 'wdth' 70;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    color: var(--txt-apoio);
+    font-variant-numeric: tabular-nums;
+}
+
+.bar-list-row-top .label .turno-dot {
+    margin-right: 7px;
+}
+
+/* Muitas barras: some com a folga e deixa so alguns rotulos. */
+.bar-chart.denso {
+    gap: 3px;
+}
+
+.bar-chart.denso .bar-chart-value {
+    display: none;
+}
+
+.bar-chart.denso .bar-chart-bar {
+    border-radius: 3px 3px 1px 1px;
+}
 .stat-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
