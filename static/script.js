@@ -339,7 +339,10 @@ function refreshSearchSelect(selectEl) {
 function renderCampos() {
     const container = document.getElementById('campos-dinamicos');
     container.innerHTML = '';
-    container.className = 'campos-grid';
+    // Reescrever className aqui derrubava .form-card-body, e com ela o
+    // preenchimento da ficha e a grade de duas colunas: os campos passavam a
+    // encostar nas bordas do cartao.
+    container.className = 'form-card-body campos-grid';
 
     const campos = (formConfig.campos || [])
         .filter(c => c.ativo !== false && !CAMPOS_SKIP.has(c.chave))

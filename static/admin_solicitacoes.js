@@ -321,14 +321,6 @@ function montarFormularioEdicao(sol) {
     gSetor.appendChild(selSetor);
     grid.appendChild(gSetor);
 
-    const gEquip = document.createElement('div');
-    gEquip.className = 'form-group';
-    gEquip.innerHTML = '<label>Equipamento</label>';
-    const selEquip = montarSelectOpcoes('equipamento', sol.equipamento || '');
-    selEquip.dataset.campo = 'equipamento';
-    gEquip.appendChild(selEquip);
-    grid.appendChild(gEquip);
-
     const gAs = document.createElement('div');
     gAs.className = 'form-group';
     gAs.innerHTML = '<label>AS (Área de Serviço)</label>';
@@ -357,15 +349,11 @@ function montarFormularioEdicao(sol) {
 
     wrap.appendChild(grid);
 
-    const gObs = document.createElement('div');
-    gObs.className = 'form-group';
-    gObs.innerHTML = '<label>Observação</label>';
-    const textarea = document.createElement('textarea');
-    textarea.dataset.campo = 'observacao';
-    textarea.rows = 3;
-    textarea.value = sol.observacao || '';
-    gObs.appendChild(textarea);
-    wrap.appendChild(gObs);
+    // Os itens vem todos na mesma tabela; o que separa um equipamento de uma
+    // funcao e o nome bater com a lista de equipamentos cadastrada.
+    const todos = (sol.solicitacao_itens || []).filter(i => i.funcao);
+    const itens = todos.filter(i => !ehEquipamento(i.funcao));
+    const itensEquip = todos.filter(i => ehEquipamento(i.funcao));
 
     const funcTitle = document.createElement('div');
     funcTitle.className = 'sol-edit-secao-titulo';
@@ -376,7 +364,6 @@ function montarFormularioEdicao(sol) {
     blocosContainer.className = 'blocos-lista edit-blocos-container';
     wrap.appendChild(blocosContainer);
 
-    const itens = (sol.solicitacao_itens || []).filter(i => i.funcao);
     if (itens.length) {
         itens.forEach(item => adicionarBlocoEdicao(blocosContainer, item));
     } else {
@@ -389,6 +376,35 @@ function montarFormularioEdicao(sol) {
     btnAdd.textContent = '+ Adicionar função';
     btnAdd.addEventListener('click', () => adicionarBlocoEdicao(blocosContainer, null));
     wrap.appendChild(btnAdd);
+
+    const equipTitle = document.createElement('div');
+    equipTitle.className = 'sol-edit-secao-titulo';
+    equipTitle.textContent = 'Equipamentos';
+    wrap.appendChild(equipTitle);
+
+    const equipContainer = document.createElement('div');
+    equipContainer.className = 'blocos-lista edit-equip-container';
+    wrap.appendChild(equipContainer);
+
+    itensEquip.forEach(item => adicionarBlocoEquipamentoEdicao(equipContainer, item));
+
+    const btnAddEquip = document.createElement('button');
+    btnAddEquip.type = 'button';
+    btnAddEquip.className = 'btn-add';
+    btnAddEquip.textContent = '+ Adicionar equipamento';
+    btnAddEquip.addEventListener('click', () => adicionarBlocoEquipamentoEdicao(equipContainer, null));
+    wrap.appendChild(btnAddEquip);
+
+    const gObs = document.createElement('div');
+    gObs.className = 'form-group';
+    gObs.style.marginTop = '18px';
+    gObs.innerHTML = '<label>Observação</label>';
+    const textarea = document.createElement('textarea');
+    textarea.dataset.campo = 'observacao';
+    textarea.rows = 3;
+    textarea.value = sol.observacao || '';
+    gObs.appendChild(textarea);
+    wrap.appendChild(gObs);
 
     const msgErro = document.createElement('p');
     msgErro.className = 'erro-inline sol-edit-erro';
@@ -626,10 +642,102 @@ function adicionarBlocoEdicao(container, itemExistente) {
     return bloco;
 }
 
+/* Um item e equipamento quando o nome consta na lista de equipamentos
+   cadastrada — a tabela de itens nao guarda o tipo. */
+function ehEquipamento(nome) {
+    const lista = (formConfigCache?.opcoes?.equipamento) || [];
+    const alvo = String(nome || '').trim().toLowerCase();
+    return lista.some(o => String(o.valor || '').trim().toLowerCase() === alvo);
+}
+
+function adicionarBlocoEquipamentoEdicao(container, itemExistente) {
+    const bloco = document.createElement('div');
+    bloco.className = 'bloco-item bloco-equipamento';
+
+    const topo = document.createElement('div');
+    topo.className = 'bloco-item-top';
+    const badge = document.createElement('span');
+    badge.className = 'bloco-item-badge badge-equip';
+    badge.textContent = `Equipamento ${container.querySelectorAll('.bloco-equipamento').length + 1}`;
+    const btnRemover = document.createElement('button');
+    btnRemover.type = 'button';
+    btnRemover.className = 'btn-remover-bloco';
+    btnRemover.title = 'Remover equipamento';
+    btnRemover.setAttribute('aria-label', 'Remover equipamento');
+    btnRemover.textContent = '×';
+    btnRemover.addEventListener('click', () => {
+        bloco.remove();
+        renumerarEquipamentosEdicao(container);
+    });
+    topo.appendChild(badge);
+    topo.appendChild(btnRemover);
+    bloco.appendChild(topo);
+
+    const corpo = document.createElement('div');
+    corpo.className = 'bloco-item-body';
+    const grid = document.createElement('div');
+    grid.className = 'bloco-grid';
+
+    const gEquip = document.createElement('div');
+    gEquip.className = 'form-group';
+    gEquip.style.marginBottom = '0';
+    gEquip.innerHTML = '<label>Equipamento</label>';
+    const selEquip = montarSelectOpcoes('equipamento', itemExistente?.funcao || '');
+    selEquip.classList.add('equipamento-select-edicao');
+    gEquip.appendChild(selEquip);
+    grid.appendChild(gEquip);
+
+    // O operador fica no primeiro colaborador do item.
+    const op = (itemExistente?.colaboradores || [])[0];
+    const opTexto = op ? `${op.matricula || ''} - ${op.nome || ''}`.trim() : '';
+    const gOp = document.createElement('div');
+    gOp.className = 'form-group';
+    gOp.style.marginBottom = '0';
+    gOp.innerHTML = '<label>Operador</label>';
+    gOp.appendChild(montarComboboxOperador(opTexto));
+    grid.appendChild(gOp);
+
+    corpo.appendChild(grid);
+    bloco.appendChild(corpo);
+    container.appendChild(bloco);
+    renumerarEquipamentosEdicao(container);
+    return bloco;
+}
+
+function renumerarEquipamentosEdicao(container) {
+    container.querySelectorAll('.bloco-equipamento').forEach((bloco, i) => {
+        const badge = bloco.querySelector('.bloco-item-badge');
+        if (badge) badge.textContent = `Equipamento ${i + 1}`;
+    });
+}
+
+function montarComboboxOperador(valorInicial) {
+    const wrap = document.createElement('div');
+    wrap.className = 'combobox';
+    wrap.dataset.campo = 'operador';
+    const temValor = !!valorInicial;
+    wrap.innerHTML = `
+        <input type="search" class="combobox-input" placeholder="Matrícula ou nome" autocomplete="off">
+        <input type="hidden" value="${escAttr(valorInicial || '')}">
+        <div class="combobox-lista" hidden></div>
+        <div class="combobox-selecionado" ${temValor ? '' : 'hidden'}>${temValor ? `<span>${escapar(valorInicial)}</span><button type="button" class="btn-x-mini" title="Limpar">×</button>` : ''}</div>
+    `;
+    const hidden = wrap.querySelector('input[type="hidden"]');
+    const sel = wrap.querySelector('.combobox-selecionado');
+    sel.querySelector('.btn-x-mini')?.addEventListener('click', () => {
+        hidden.value = '';
+        sel.hidden = true;
+        sel.innerHTML = '';
+    });
+    setupCombobox(wrap, efetivoCache || [], (item) => {
+        hidden.value = `${item.matricula} - ${item.nome}`;
+    }, () => { hidden.value = ''; });
+    return wrap;
+}
+
 function coletarDadosEdicao(formWrap) {
     const solicitante = formWrap.querySelector('[data-campo="solicitante"] input[type="hidden"]')?.value || '';
     const setor_solicitante = formWrap.querySelector('[data-campo="setor_solicitante"] select')?.value || '';
-    const equipamento = formWrap.querySelector('[data-campo="equipamento"] select')?.value || '';
     const as_code = formWrap.querySelector('[data-campo="as_code"] select')?.value || '';
     const data_solicitacao = formWrap.querySelector('[data-campo="data_solicitacao"]')?.value || '';
     const turno = formWrap.querySelector('[data-campo="turno"] input:checked')?.value || 'Dia';
@@ -650,7 +758,22 @@ function coletarDadosEdicao(formWrap) {
         itens.push({ funcao, quantidade, colaboradores, tipo: 'funcao' });
     });
 
-    return { solicitante, setor_solicitante, equipamento, as_code, data_solicitacao, turno, observacao, itens };
+    const equipamentos = [];
+    formWrap.querySelectorAll('.edit-equip-container .bloco-equipamento').forEach(bloco => {
+        const nome = bloco.querySelector('select')?.value;
+        if (!nome) return;
+        const texto = bloco.querySelector('[data-campo="operador"] input[type="hidden"]')?.value || '';
+        const partes = texto.split(' - ');
+        const operador = texto
+            ? { matricula: partes[0]?.trim(), nome: partes.slice(1).join(' - ').trim() || texto, a_procura: false }
+            : null;
+        equipamentos.push({ equipamento: nome, operador });
+    });
+
+    // O campo legado no cabecalho passa a ser o primeiro equipamento da lista.
+    const equipamento = equipamentos.length ? equipamentos[0].equipamento : '';
+
+    return { solicitante, setor_solicitante, equipamento, as_code, data_solicitacao, turno, observacao, itens, equipamentos };
 }
 
 async function salvarEdicao(id, formWrap, btnSalvar, msgErro) {
