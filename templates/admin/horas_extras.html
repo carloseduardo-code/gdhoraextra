@@ -1,0 +1,120 @@
+{% extends "admin/base.html" %}
+{% set page_title = "Horas extras - Admin" %}
+
+{% block content %}
+<div class="page-title-row">
+    <div>
+        <h1>Horas extras</h1>
+        <p class="he-sub">Período de apuração <strong>{{ horas.inicio_br }} a {{ horas.fim_br }}</strong> · limite de 40 h por colaborador, 80 h motorista</p>
+    </div>
+    <div class="he-top-actions">
+        <a href="{{ url_for('admin_horas_extras', ciclo=horas.offset - 1, filtro=filtro) }}" class="btn-secondary" style="min-height:44px;padding:0 15px;font-size:14px;">Ciclo anterior</a>
+        {% if horas.offset != 0 %}
+        <a href="{{ url_for('admin_horas_extras', filtro=filtro) }}" class="btn-secondary" style="min-height:44px;padding:0 15px;font-size:14px;">Ciclo atual</a>
+        {% endif %}
+        <button type="button" class="btn-secondary" style="min-height:44px;padding:0 15px;font-size:14px;" onclick="exportarExcel()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 5 5-5M4 21h16"></path></svg>
+            Exportar
+        </button>
+    </div>
+</div>
+
+<div class="he-banda">
+    <div>
+        <div class="he-banda-label">Acumulado no período</div>
+        <div class="he-banda-num">
+            <span class="he-banda-valor">{{ horas.total_horas_fmt }}</span>
+            <span class="he-banda-unid">h</span>
+        </div>
+        <div class="he-banda-meta">
+            {{ horas.total_colaboradores }} colaborador{{ 'es' if horas.total_colaboradores != 1 else '' }} · média de {{ horas.media_fmt }} h
+            {%- if horas.dias_restantes is not none %} · fecha em {{ horas.dias_restantes }} dia{{ 's' if horas.dias_restantes != 1 else '' }}{% endif %}
+        </div>
+    </div>
+    <div class="he-banda-div"></div>
+    <div class="he-banda-cols">
+        <div>
+            <div class="he-banda-sub">Próximos do limite</div>
+            <div class="he-banda-num2">{{ horas.n_proximo }}</div>
+            <div class="he-banda-hint">a 5 h ou menos do teto</div>
+        </div>
+        <div>
+            <div class="he-banda-sub">No limite</div>
+            <div class="he-banda-num2">{{ horas.n_no_limite }}</div>
+            <div class="he-banda-hint">sem saldo restante</div>
+        </div>
+        <div>
+            <div class="he-banda-sub">Acima do limite</div>
+            <div class="he-banda-num2">{{ horas.n_acima }}</div>
+            <div class="he-banda-hint">{{ horas.excedente_total }} h excedentes</div>
+        </div>
+    </div>
+</div>
+
+<div class="table-card he-card">
+    <div class="he-card-head">
+        <h2>Colaboradores</h2>
+        <div class="he-filtros">
+            <a href="{{ url_for('admin_horas_extras', ciclo=horas.offset, filtro='risco') }}" class="{{ 'active' if filtro == 'risco' else '' }}">Em risco · {{ horas.em_risco }}</a>
+            <a href="{{ url_for('admin_horas_extras', ciclo=horas.offset, filtro='motoristas') }}" class="{{ 'active' if filtro == 'motoristas' else '' }}">Motoristas</a>
+            <a href="{{ url_for('admin_horas_extras', ciclo=horas.offset, filtro='todos') }}" class="{{ 'active' if filtro == 'todos' else '' }}">Todos · {{ horas.total_colaboradores }}</a>
+        </div>
+    </div>
+
+    <div class="he-row he-row-head">
+        <span class="he-col-nome">Colaborador</span>
+        <span class="he-col-funcao">Função</span>
+        <span class="he-col-barra">Acumulado no ciclo</span>
+        <span class="he-col-restam">Restam</span>
+        <span class="he-col-situacao">Situação</span>
+    </div>
+
+    {% for r in linhas %}
+    <div class="he-row">
+        <div class="he-col-nome">
+            <div class="he-nome">{{ r.nome }}</div>
+            <div class="he-mat">mat. {{ r.matricula }}</div>
+        </div>
+        <span class="he-col-funcao he-funcao">{{ r.funcao }}</span>
+        <div class="he-col-barra he-barra-wrap">
+            <span class="he-barra-num">{{ r.acumulado }} / {{ r.teto }} h</span>
+            <div class="he-barra-track"><div class="he-barra-fill he-fill-{{ r.situacao }}" style="width:{{ r.pct }}%"></div></div>
+        </div>
+        <span class="he-col-restam he-restam he-restam-{{ r.situacao }}">{{ r.restam }} h</span>
+        <span class="he-col-situacao he-situacao he-situacao-{{ r.situacao }}">{{ r.situacao_label }}</span>
+    </div>
+    {% else %}
+    <div class="empty-state" style="border:none;">
+        <div class="empty-state-title">Ninguém nessa faixa</div>
+        <div class="empty-state-hint">Troque o filtro para ver outros colaboradores.</div>
+    </div>
+    {% endfor %}
+
+    {% if linhas %}
+    <div class="he-card-foot">
+        <span>{{ linhas|length }} de {{ horas.total_colaboradores }} colaboradores</span>
+    </div>
+    {% endif %}
+</div>
+
+<div class="table-card he-card">
+    <div class="he-card-head">
+        <h2>Mais solicitados no período</h2>
+        <span class="he-hint">exclui analista, engenheiro, supervisor e encarregado</span>
+    </div>
+    <div class="he-repetidos-grid">
+        {% for r in horas.top_solicitados %}
+        <div class="he-repetido-item">
+            <span>{{ r.nome }} <span class="he-repetido-funcao">· {{ r.funcao }}</span></span>
+            <span class="he-repetido-count">{{ r.solicitacoes }} solicitações</span>
+        </div>
+        {% else %}
+        <p class="hint" style="margin:0 0 16px;">Ninguém se repetiu neste ciclo.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='admin_common.js') }}"></script>
+{% endblock %}
