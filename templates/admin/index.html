@@ -5,16 +5,36 @@
 <div class="page-title-row">
     <div>
         <h1>Visão geral</h1>
-        <p>Solicitações recebidas nos últimos 7 dias.</p>
+        <p>{{ dash.filtro.rotulo }} · por data do serviço</p>
     </div>
     <div style="display:flex;gap:8px;">
         <button type="button" class="btn-secondary" onclick="exportarExcel()">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 5 5-5M4 21h16"></path></svg>
             Exportar Excel
         </button>
-        <a href="{{ url_for('admin_solicitacoes') }}" class="btn-primary" style="min-height:38px;padding:0 15px;font-size:13px;">Ver solicitações</a>
+        <a href="{{ url_for('admin_solicitacoes') }}" class="btn-primary" style="min-height:44px;padding:0 15px;font-size:13px;">Ver solicitações</a>
     </div>
 </div>
+
+<!-- Um painel geral e um de um dia só: os períodos à esquerda, o dia à direita.
+     Escolher um dia manda no período. -->
+<form class="dash-filtro" method="get" action="{{ url_for('admin_home') }}">
+    <div class="dash-filtro-periodos" role="group" aria-label="Período">
+        {% for valor, texto in [('7', '7 dias'), ('30', '30 dias'), ('tudo', 'Tudo')] %}
+        <button type="submit" name="periodo" value="{{ valor }}"
+                class="dash-perido-btn{{ ' ativo' if dash.filtro.periodo == valor else '' }}"
+                {{ 'aria-current=true' if dash.filtro.periodo == valor else '' }}>{{ texto }}</button>
+        {% endfor %}
+    </div>
+    <div class="dash-filtro-dia">
+        <label for="dash-dia">Dia específico</label>
+        <input type="date" id="dash-dia" name="dia" value="{{ dash.filtro.dia }}"
+               onchange="this.form.submit()">
+        {% if dash.filtro.eh_dia %}
+        <a href="{{ url_for('admin_home') }}" class="btn-secondary dash-filtro-limpar">Limpar dia</a>
+        {% endif %}
+    </div>
+</form>
 
 <div class="stat-grid">
     {% for m in dash.metrics %}
@@ -33,19 +53,56 @@
     <div class="dash-card">
         <div class="dash-card-head">
             <h2>Solicitações por dia</h2>
-            <span class="tag">7 dias</span>
+            <span class="tag">{{ dash.dias|length }} dias</span>
         </div>
-        <div class="bar-chart">
+        {% if dash.dias %}
+        <div class="bar-chart{{ ' denso' if dash.dias|length > 10 else '' }}">
             {% for d in dash.dias %}
-            <div class="bar-chart-col">
+            <div class="bar-chart-col" title="{{ d.titulo }} · {{ d.value }}">
                 <span class="bar-chart-value">{{ d.value }}</span>
                 <div class="bar-chart-bar{{ ' current' if d.atual else '' }}" style="height:{{ d.altura }}px;"></div>
                 <span class="bar-chart-label">{{ d.label }}</span>
             </div>
             {% endfor %}
         </div>
+        {% else %}
+        <p class="hint" style="margin:16px 0 0;">Sem solicitações no período.</p>
+        {% endif %}
     </div>
 
+    <!-- Horas: turno normal de 8 h, extensão de 2 h, multiplicado pelas
+         pessoas distintas de cada solicitação. -->
+    <div class="dash-card">
+        <div class="dash-card-head">
+            <h2>Horas por turno</h2>
+            <span class="tag">8 h · extensão 2 h</span>
+        </div>
+        {% if dash.horas.por_turno %}
+        <div class="horas-total">
+            <span class="horas-total-valor">{{ dash.horas.total }} h</span>
+            <span class="horas-total-hint">no período · média de {{ dash.horas.media }} h por colaborador</span>
+        </div>
+        <div class="bar-list" style="margin-top:14px;">
+            {% for t in dash.horas.por_turno %}
+            <div>
+                <div class="bar-list-row-top">
+                    <span class="label"><span class="dot turno-dot {{ t.css }}"></span>{{ t.label }}</span>
+                    <span class="value">{{ t.horas }} h</span>
+                </div>
+                <div class="bar-list-track">
+                    <div class="bar-list-fill{{ ' top' if loop.first else '' }}" style="width:{{ t.pct }}%;"></div>
+                </div>
+                <div class="horas-conta">{{ t.unit }} h × {{ t.pessoas }} {{ 'colaborador' if t.pessoas == 1 else 'colaboradores' }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="hint" style="margin:16px 0 0;">Sem horas lançadas no período.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="dash-grid">
     <div class="dash-card">
         <h2>Funções mais solicitadas</h2>
         <div class="bar-list">
@@ -60,7 +117,27 @@
                 </div>
             </div>
             {% else %}
-            <p class="hint" style="margin:0;">Sem dados suficientes ainda.</p>
+            <p class="hint" style="margin:0;">Sem dados suficientes no período.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="dash-card">
+        <h2 style="margin-bottom:16px;">Distribuição por turno</h2>
+        <div class="turno-split-track">
+            {% for t in dash.turno_split %}
+            <div class="turno-seg {{ t.css }}" style="width:{{ t.pct }}%;"></div>
+            {% endfor %}
+        </div>
+        <div class="turno-split-legend">
+            {% for t in dash.turno_split %}
+            <div class="turno-split-legend-item">
+                <span class="dot turno-dot {{ t.css }}"></span>
+                <span>{{ t.label }}</span>
+                <span class="value">{{ t.value }}</span>
+            </div>
+            {% else %}
+            <p class="hint" style="margin:0;">Sem solicitações no período.</p>
             {% endfor %}
         </div>
     </div>
@@ -69,7 +146,7 @@
 <div class="dash-grid">
     <div class="dash-card" style="padding:0;">
         <div class="dash-card-head" style="padding:18px 20px;">
-            <h2>Últimas solicitações</h2>
+            <h2>{{ 'Solicitações do dia' if dash.filtro.eh_dia else 'Últimas solicitações' }}</h2>
             <a href="{{ url_for('admin_solicitacoes') }}" style="font-size:12.5px;font-weight:600;">Ver todas</a>
         </div>
         <div>
@@ -81,56 +158,36 @@
                 </div>
                 <div class="recent-list-info">
                     <div class="recent-list-title">{{ r.titulo }}</div>
-                    <div class="recent-list-meta">{{ r.solicitante }} · {{ r.setor }} · {{ r.qtd }} colaboradores</div>
+                    <div class="recent-list-meta">{{ r.solicitante }} · {{ r.setor }} · {{ r.qtd }} colaboradores · {{ r.horas }} h</div>
                 </div>
                 <span class="chip-badge turno {{ r.turno_css }}">{{ r.turno }}</span>
             </div>
             {% else %}
-            <div class="empty-state" style="border:none;box-shadow:none;">
-                <div class="empty-state-title">Nenhuma solicitação ainda</div>
+            <div class="empty-state" style="border:none;">
+                <div class="empty-state-title">Nenhuma solicitação no período</div>
+                <div class="empty-state-hint">Troque o período ou limpe o filtro de dia.</div>
             </div>
             {% endfor %}
         </div>
     </div>
 
-    <div class="dash-card-flat">
-        <div class="dash-card">
-            <h2 style="margin-bottom:16px;">Distribuição por turno</h2>
-            <div class="turno-split-track">
-                {% for t in dash.turno_split %}
-                <div class="turno-seg {{ t.css }}" style="width:{{ t.pct }}%;"></div>
-                {% endfor %}
-            </div>
-            <div class="turno-split-legend">
-                {% for t in dash.turno_split %}
-                <div class="turno-split-legend-item">
-                    <span class="dot turno-dot {{ t.css }}"></span>
-                    <span>{{ t.label }}</span>
-                    <span class="value">{{ t.value }}</span>
-                </div>
-                {% else %}
-                <p class="hint" style="margin:0;">Sem solicitações registradas ainda.</p>
-                {% endfor %}
-            </div>
-        </div>
-        <div class="quick-links">
-            <a href="{{ url_for('admin_efetivo') }}" class="quick-link">
-                <div class="quick-link-title">Efetivo</div>
-                <div class="quick-link-desc">Consultar e importar planilha</div>
-            </a>
-            <a href="{{ url_for('admin_config') }}" class="quick-link">
-                <div class="quick-link-title">Configuração</div>
-                <div class="quick-link-desc">Equipamentos, setores e AS</div>
-            </a>
-            <a href="{{ url_for('admin_usuarios') }}" class="quick-link">
-                <div class="quick-link-title">Usuários</div>
-                <div class="quick-link-desc">Acessos da área admin</div>
-            </a>
-            <a href="{{ url_for('admin_auditoria') }}" class="quick-link">
-                <div class="quick-link-title">Auditoria</div>
-                <div class="quick-link-desc">Remoções e alterações</div>
-            </a>
-        </div>
+    <div class="quick-links">
+        <a href="{{ url_for('admin_efetivo') }}" class="quick-link">
+            <div class="quick-link-title">Efetivo</div>
+            <div class="quick-link-desc">Consultar e importar planilha</div>
+        </a>
+        <a href="{{ url_for('admin_config') }}" class="quick-link">
+            <div class="quick-link-title">Configuração</div>
+            <div class="quick-link-desc">Equipamentos, setores e AS</div>
+        </a>
+        <a href="{{ url_for('admin_usuarios') }}" class="quick-link">
+            <div class="quick-link-title">Usuários</div>
+            <div class="quick-link-desc">Acessos da área admin</div>
+        </a>
+        <a href="{{ url_for('admin_auditoria') }}" class="quick-link">
+            <div class="quick-link-title">Auditoria</div>
+            <div class="quick-link-desc">Remoções e alterações</div>
+        </a>
     </div>
 </div>
 {% endblock %}

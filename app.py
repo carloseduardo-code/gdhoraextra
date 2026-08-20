@@ -2,6 +2,7 @@ import os
 import json
 import re
 import time
+import unicodedata
 from datetime import datetime, timedelta
 from functools import wraps
 from io import BytesIO
@@ -60,6 +61,11 @@ def cache_set(chave, valor, ttl=CACHE_TTL_PADRAO):
 
 def cache_invalidar(*chaves):
     for chave in chaves:
+        _cache.pop(chave, None)
+
+
+def cache_invalidar_prefixo(prefixo):
+    for chave in [k for k in _cache if str(k).startswith(prefixo)]:
         _cache.pop(chave, None)
 
 
@@ -492,22 +498,91 @@ def _parse_dt(valor):
         return None
 
 
-def calcular_metricas_dashboard():
-    cached = cache_get("dashboard_metricas")
+# Carga horária por turno. O turno normal (dia ou noite) é a jornada cheia de
+# 8 h; a extensão de horário são as 2 h emendadas ao fim do expediente.
+HORAS_POR_TURNO = {"Dia": 8, "Noite": 8, "Extensão de Horário": 2}
+HORAS_TURNO_PADRAO = 8
+
+
+def horas_do_turno(turno):
+    """Horas de um turno, tolerante a acento e caixa.
+
+    Os turnos sao cadastraveis na configuracao, entao "Extensao de horario"
+    e "Extensão de Horário" precisam valer a mesma coisa — errar aqui inflaria
+    a conta de horas em silencio.
+    """
+    bruto = str(turno or "").strip()
+    if not bruto:
+        return HORAS_TURNO_PADRAO
+    normal = unicodedata.normalize("NFD", bruto).encode("ascii", "ignore").decode().lower()
+    if "extens" in normal:
+        return HORAS_POR_TURNO["Extensão de Horário"]
+    for nome, horas in HORAS_POR_TURNO.items():
+        alvo = unicodedata.normalize("NFD", nome).encode("ascii", "ignore").decode().lower()
+        if normal == alvo:
+            return horas
+    return HORAS_TURNO_PADRAO
+
+
+def _pessoas_da_solicitacao(sol):
+    """Matrículas distintas na solicitação.
+
+    Uma pessoa marcada em duas funções do mesmo pedido trabalha um turno, não
+    dois — contá-la duas vezes dobraria as horas dela.
+    """
+    pessoas = set()
+    for item in sol.get("solicitacao_itens") or []:
+        for c in item.get("colaboradores") or []:
+            chave = (c.get("matricula") or c.get("nome") or "").strip().lower()
+            if chave:
+                pessoas.add(chave)
+    return pessoas
+
+
+def _janela_dashboard(periodo, dia):
+    """Devolve (inicio, fim, rotulo, eh_dia) em datas, inclusive nas pontas."""
+    hoje = datetime.now().date()
+    if dia:
+        try:
+            d = datetime.strptime(dia, "%Y-%m-%d").date()
+        except ValueError:
+            d = hoje
+        rotulo = f"{d.day} de {MESES_EXTENSO_PT[d.month - 1]} de {d.year}"
+        return d, d, rotulo, True
+    if periodo == "tudo":
+        return None, None, "Todo o período", False
+    dias = 30 if periodo == "30" else 7
+    return hoje - timedelta(days=dias - 1), hoje, f"Últimos {dias} dias", False
+
+
+def calcular_metricas_dashboard(periodo="7", dia=""):
+    chave = f"dashboard_metricas:{periodo}:{dia}"
+    cached = cache_get(chave)
     if cached is not None:
         return cached
-    return _calcular_metricas_dashboard_sem_cache()
+    resultado = _calcular_metricas_dashboard_sem_cache(periodo, dia)
+    cache_set(chave, resultado, ttl=30)
+    return resultado
 
 
-def _calcular_metricas_dashboard_sem_cache():
+def _calcular_metricas_dashboard_sem_cache(periodo="7", dia=""):
+    inicio, fim, rotulo, eh_dia = _janela_dashboard(periodo, dia)
+    filtro = {
+        "periodo": "dia" if eh_dia else (periodo or "7"),
+        "dia": dia or "",
+        "rotulo": rotulo,
+        "eh_dia": eh_dia,
+    }
     vazio = {
+        "filtro": filtro,
         "metrics": [
-            {"label": "Solicitações hoje", "value": 0, "delta": "", "delta_dir": "", "hint": ""},
-            {"label": "Esta semana", "value": 0, "delta": "", "delta_dir": "", "hint": ""},
-            {"label": "Colaboradores solicitados", "value": 0, "delta": "", "delta_dir": "", "hint": "soma da semana"},
-            {"label": "Equipamentos vinculados", "value": 0, "delta": "", "delta_dir": "", "hint": "solicitações da semana"},
+            {"label": "Solicitações", "value": 0, "delta": "", "delta_dir": "", "hint": rotulo.lower()},
+            {"label": "Colaboradores", "value": 0, "delta": "", "delta_dir": "", "hint": "pessoas distintas"},
+            {"label": "Horas extras", "value": "0 h", "delta": "", "delta_dir": "", "hint": "turno × pessoas"},
+            {"label": "Equipamentos", "value": 0, "delta": "", "delta_dir": "", "hint": "vinculados no período"},
         ],
-        "dias": [{"label": DIAS_PT[(datetime.now().date() - timedelta(days=i)).weekday()], "value": 0, "altura": 20, "atual": i == 0} for i in range(6, -1, -1)],
+        "horas": {"total": 0, "por_turno": [], "media": 0},
+        "dias": [],
         "top_funcoes": [],
         "turno_split": [],
         "recentes": [],
@@ -520,81 +595,130 @@ def _calcular_metricas_dashboard_sem_cache():
         res = (
             supabase.table("solicitacoes")
             .select("*, solicitacao_itens(*)")
-            .order("criado_em", desc=True)
+            .order("data_solicitacao", desc=True)
             .execute()
         )
         dados = res.data or []
     except Exception:
         return vazio
 
-    agora = datetime.now()
-    hoje = agora.date()
-    ontem = hoje - timedelta(days=1)
-    inicio_semana = agora - timedelta(days=7)
-    inicio_semana_anterior = agora - timedelta(days=14)
-
-    hoje_count = ontem_count = semana_count = semana_anterior_count = 0
-    colaboradores_semana = equipamentos_semana = 0
-    contagem_dias = {}
-    funcao_totais = {}
-    turno_totais = {}
-
-    for sol in dados:
+    def data_da(sol):
+        """A data em que a hora extra acontece — não a de digitação."""
+        bruta = sol.get("data_solicitacao")
+        if bruta:
+            try:
+                return datetime.strptime(str(bruta)[:10], "%Y-%m-%d").date()
+            except ValueError:
+                pass
         dt = _parse_dt(sol.get("criado_em"))
-        if dt is None:
-            continue
-        if dt.date() == hoje:
-            hoje_count += 1
-        if dt.date() == ontem:
-            ontem_count += 1
-        na_semana = dt >= inicio_semana
-        if na_semana:
-            semana_count += 1
-        elif dt >= inicio_semana_anterior:
-            semana_anterior_count += 1
+        return dt.date() if dt else None
 
-        itens = sol.get("solicitacao_itens") or []
-        equip_nome = (sol.get("equipamento") or "").strip()
+    def na_janela(d, ini, f):
+        if d is None:
+            return False
+        if ini and d < ini:
+            return False
+        if f and d > f:
+            return False
+        return True
 
-        if na_semana:
-            colaboradores_semana += sum(len(it.get("colaboradores") or []) for it in itens)
-            if equip_nome:
-                equipamentos_semana += 1
+    # Janela anterior de mesmo tamanho, para as variações.
+    if inicio and fim:
+        tamanho = (fim - inicio).days + 1
+        ant_fim = inicio - timedelta(days=1)
+        ant_inicio = ant_fim - timedelta(days=tamanho - 1)
+    else:
+        ant_inicio = ant_fim = None
 
-        dia_key = dt.date().isoformat()
-        contagem_dias[dia_key] = contagem_dias.get(dia_key, 0) + 1
+    no_periodo, no_anterior = [], []
+    for sol in dados:
+        d = data_da(sol)
+        if na_janela(d, inicio, fim):
+            no_periodo.append((d, sol))
+        elif ant_inicio and na_janela(d, ant_inicio, ant_fim):
+            no_anterior.append((d, sol))
 
+    def agrega(lista):
+        pessoas, horas, equipamentos = set(), 0, 0
+        for _, sol in lista:
+            do_pedido = _pessoas_da_solicitacao(sol)
+            pessoas |= do_pedido
+            horas += horas_do_turno(sol.get("turno") or "Dia") * len(do_pedido)
+            if (sol.get("equipamento") or "").strip():
+                equipamentos += 1
+        return len(pessoas), horas, equipamentos
+
+    pessoas_qtd, horas_total, equip_qtd = agrega(no_periodo)
+    pessoas_ant, horas_ant, _ = agrega(no_anterior)
+
+    # ---- horas por turno ----
+    turno_totais, turno_pessoas, turno_horas = {}, {}, {}
+    funcao_totais = {}
+    contagem_dias = {}
+    for d, sol in no_periodo:
         turno = sol.get("turno") or "Dia"
+        do_pedido = _pessoas_da_solicitacao(sol)
         turno_totais[turno] = turno_totais.get(turno, 0) + 1
+        turno_pessoas[turno] = turno_pessoas.get(turno, 0) + len(do_pedido)
+        turno_horas[turno] = turno_horas.get(turno, 0) + horas_do_turno(turno) * len(do_pedido)
+        if d:
+            contagem_dias[d.isoformat()] = contagem_dias.get(d.isoformat(), 0) + 1
 
-        for it in itens:
-            funcao = (it.get("funcao") or "").strip()
+        equip_nome = (sol.get("equipamento") or "").strip()
+        for item in sol.get("solicitacao_itens") or []:
+            funcao = (item.get("funcao") or "").strip()
             if not funcao or (equip_nome and funcao.upper() == equip_nome.upper()):
                 continue
-            qtd = len(it.get("colaboradores") or []) or int(it.get("quantidade") or 0)
+            qtd = len(item.get("colaboradores") or []) or int(item.get("quantidade") or 0)
             funcao_totais[funcao] = funcao_totais.get(funcao, 0) + qtd
 
-    dias = []
-    valores_semana = []
-    for i in range(6, -1, -1):
-        d = hoje - timedelta(days=i)
-        valores_semana.append(contagem_dias.get(d.isoformat(), 0))
-    max_dia = max(valores_semana) or 1
-    for i, i_dias_atras in enumerate(range(6, -1, -1)):
-        d = hoje - timedelta(days=i_dias_atras)
-        v = valores_semana[i]
-        dias.append({
-            "label": DIAS_PT[d.weekday()],
-            "value": v,
-            "altura": round(20 + (v / max_dia) * 96) if max_dia else 20,
-            "atual": i_dias_atras == 0,
-        })
+    max_horas = max(turno_horas.values()) if turno_horas else 0
+    horas_por_turno = [
+        {
+            "label": t,
+            "css": turno_css(t),
+            "unit": horas_do_turno(t),
+            "pessoas": turno_pessoas.get(t, 0),
+            "horas": turno_horas.get(t, 0),
+            "pct": round(turno_horas.get(t, 0) / max_horas * 100) if max_horas else 0,
+        }
+        for t in ("Dia", "Noite", "Extensão de Horário")
+        if turno_totais.get(t, 0) > 0
+    ]
 
-    top_funcoes_lista = sorted(funcao_totais.items(), key=lambda kv: kv[1], reverse=True)[:5]
-    max_funcao = (top_funcoes_lista[0][1] if top_funcoes_lista else 0) or 1
+    # ---- barras por dia ----
+    if eh_dia:
+        janela_fim = fim
+        n_barras = 7
+    elif inicio and fim:
+        janela_fim = fim
+        n_barras = min((fim - inicio).days + 1, 31)
+    else:
+        janela_fim = datetime.now().date()
+        n_barras = 30
+
+    valores = []
+    for i in range(n_barras - 1, -1, -1):
+        d = janela_fim - timedelta(days=i)
+        valores.append((d, contagem_dias.get(d.isoformat(), 0)))
+    max_dia = max((v for _, v in valores), default=0) or 1
+    passo_rotulo = 1 if n_barras <= 10 else (3 if n_barras <= 16 else 5)
+    dias_barras = [
+        {
+            "label": DIAS_PT[d.weekday()] if (idx % passo_rotulo == 0 or idx == n_barras - 1) else "",
+            "titulo": d.strftime("%d/%m"),
+            "value": v,
+            "altura": round(20 + (v / max_dia) * 96),
+            "atual": (eh_dia and d == fim) or (not eh_dia and d == datetime.now().date()),
+        }
+        for idx, (d, v) in enumerate(valores)
+    ]
+
+    top_lista = sorted(funcao_totais.items(), key=lambda kv: kv[1], reverse=True)[:5]
+    max_funcao = (top_lista[0][1] if top_lista else 0) or 1
     top_funcoes = [
         {"label": k, "value": v, "pct": round(v / max_funcao * 100), "top": i == 0}
-        for i, (k, v) in enumerate(top_funcoes_lista)
+        for i, (k, v) in enumerate(top_lista)
     ]
 
     turno_total = sum(turno_totais.values()) or 1
@@ -605,63 +729,78 @@ def _calcular_metricas_dashboard_sem_cache():
     ]
 
     def _delta_abs(atual, anterior):
+        if ant_inicio is None:
+            return "", ""
         diff = atual - anterior
         if diff == 0:
             return "", ""
         return (f"+{diff}" if diff > 0 else str(diff)), ("up" if diff > 0 else "down")
 
-    def _delta_pct(atual, anterior):
-        if anterior <= 0:
-            return "", ""
-        pct = round((atual - anterior) / anterior * 100)
-        if pct == 0:
-            return "", ""
-        return (f"+{pct}%" if pct > 0 else f"{pct}%"), ("up" if pct > 0 else "down")
+    sol_delta, sol_dir = _delta_abs(len(no_periodo), len(no_anterior))
+    horas_delta, horas_dir = _delta_abs(horas_total, horas_ant)
+    if horas_delta:
+        horas_delta += " h"
+    pess_delta, pess_dir = _delta_abs(pessoas_qtd, pessoas_ant)
 
-    hoje_delta, hoje_dir = _delta_abs(hoje_count, ontem_count)
-    semana_delta, semana_dir = _delta_pct(semana_count, semana_anterior_count)
+    if eh_dia:
+        dica_periodo = "no dia"
+        dica_anterior = f"vs. {len(no_anterior)} no dia anterior"
+    elif ant_inicio:
+        dica_anterior = f"vs. {len(no_anterior)} no período anterior"
+        dica_periodo = rotulo.lower()
+    else:
+        dica_anterior = "todas as solicitações"
+        dica_periodo = rotulo.lower()
 
     metrics = [
-        {"label": "Solicitações hoje", "value": hoje_count, "delta": hoje_delta, "delta_dir": hoje_dir, "hint": f"vs. {ontem_count} ontem"},
-        {"label": "Esta semana", "value": semana_count, "delta": semana_delta, "delta_dir": semana_dir, "hint": f"vs. {semana_anterior_count} na anterior"},
-        {"label": "Colaboradores solicitados", "value": colaboradores_semana, "delta": "", "delta_dir": "", "hint": "soma da semana"},
-        {"label": "Equipamentos vinculados", "value": equipamentos_semana, "delta": "", "delta_dir": "", "hint": "solicitações da semana"},
+        {"label": "Solicitações", "value": len(no_periodo), "delta": sol_delta, "delta_dir": sol_dir, "hint": dica_anterior},
+        {"label": "Colaboradores", "value": pessoas_qtd, "delta": pess_delta, "delta_dir": pess_dir, "hint": "pessoas distintas"},
+        {"label": "Horas extras", "value": f"{horas_total} h", "delta": horas_delta, "delta_dir": horas_dir, "hint": "turno × pessoas"},
+        {"label": "Equipamentos", "value": equip_qtd, "delta": "", "delta_dir": "", "hint": f"vinculados {dica_periodo}"},
     ]
 
     recentes = []
-    for sol in dados[:4]:
-        itens = sol.get("solicitacao_itens") or []
-        qtd = sum(len(it.get("colaboradores") or []) for it in itens)
-        data_iso = sol.get("data_solicitacao") or ""
-        partes = str(data_iso).split("-")
+    for d, sol in no_periodo[:5]:
+        pessoas_pedido = len(_pessoas_da_solicitacao(sol))
         turno = sol.get("turno") or "Dia"
         recentes.append({
-            "dia": partes[2] if len(partes) == 3 else "—",
-            "mes": MESES_PT[int(partes[1]) - 1] if len(partes) == 3 else "",
-            "titulo": sol.get("equipamento") or sol.get("as_code") or "—",
+            "dia": f"{d.day:02d}" if d else "—",
+            "mes": MESES_PT[d.month - 1] if d else "",
+            "titulo": sol.get("as_code") or sol.get("equipamento") or "—",
             "solicitante": sol.get("solicitante") or "—",
             "setor": sol.get("setor_solicitante") or sol.get("setor") or "—",
-            "qtd": qtd,
+            "qtd": pessoas_pedido,
+            "horas": horas_do_turno(turno) * pessoas_pedido,
             "turno": turno,
             "turno_css": turno_css(turno),
         })
 
-    resultado = {
+    return {
+        "filtro": filtro,
         "metrics": metrics,
-        "dias": dias,
+        "horas": {
+            "total": horas_total,
+            "por_turno": horas_por_turno,
+            "media": (f"{horas_total / pessoas_qtd:.1f}".replace(".", ",")) if pessoas_qtd else "0",
+        },
+        "dias": dias_barras,
         "top_funcoes": top_funcoes,
         "turno_split": turno_split,
         "recentes": recentes,
-        "total_solicitacoes": len(dados),
+        "total_solicitacoes": len(no_periodo),
     }
-    cache_set("dashboard_metricas", resultado, ttl=30)
-    return resultado
 
 
 @app.route("/admin")
 @admin_required
 def admin_home():
-    return render_template("admin/index.html", user=usuario_logado(), dash=calcular_metricas_dashboard())
+    periodo = (request.args.get("periodo") or "7").strip()
+    dia = (request.args.get("dia") or "").strip()
+    return render_template(
+        "admin/index.html",
+        user=usuario_logado(),
+        dash=calcular_metricas_dashboard(periodo, dia),
+    )
 
 
 @app.route("/admin/solicitacoes")
@@ -993,7 +1132,7 @@ def create_solicitacao():
             "turno": turno,
             "itens": len(itens_norm),
         })
-        cache_invalidar("dashboard_metricas")
+        cache_invalidar_prefixo("dashboard_metricas")
 
         return jsonify({
             "message": "Solicitação criada",
@@ -1096,7 +1235,7 @@ def apagar_solicitacao(sol_id):
             "resumo_admin": snapshot.get("resumo_admin"),
             "itens": len(snapshot.get("solicitacao_itens") or []),
         })
-        cache_invalidar("dashboard_metricas")
+        cache_invalidar_prefixo("dashboard_metricas")
         return jsonify({"ok": True, "message": "Solicitação removida"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1235,7 +1374,7 @@ def editar_solicitacao_admin(sol_id):
             },
             "itens": len(itens_norm),
         })
-        cache_invalidar("dashboard_metricas")
+        cache_invalidar_prefixo("dashboard_metricas")
 
         return jsonify({
             "message": "Solicitação atualizada",
