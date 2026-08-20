@@ -1602,9 +1602,10 @@ select.invalido, input.invalido, textarea.invalido {
     .form-card-body { padding: 20px 24px 22px; }
 }
 
-.campos-grid .form-group[data-chave="solicitante"],
-.campos-grid .form-group[data-chave="as_code"],
-.campos-grid .form-group[data-chave="turno"] {
+/* So o solicitante ocupa a linha inteira; setor e AS dividem uma linha, data
+   e turno dividem a seguinte. Marcar tres campos como largura total fazia a
+   grade de duas colunas virar uma pilha. */
+.campos-grid .form-group[data-chave="solicitante"] {
     grid-column: 1 / -1;
 }
 
@@ -3435,8 +3436,10 @@ select.invalido, input.invalido, textarea.invalido {
 
 .sol-edit-form {
     margin-top: 14px;
-    padding-top: 14px;
-    border-top: 1px solid var(--borda-fina);
+    padding: 16px;
+    border: 1px solid var(--borda2);
+    border-radius: var(--raio);
+    background: var(--ficha);
 }
 
 .sol-edit-grid {
@@ -3446,13 +3449,28 @@ select.invalido, input.invalido, textarea.invalido {
     margin-bottom: 16px;
 }
 
+/* Rotulo de secao do formulario de edicao: mesma familia dos demais
+   rotulos, com folga suficiente para separar as secoes. */
 .sol-edit-secao-titulo {
-    font-size: .68rem;
-    font-weight: 600;
-    letter-spacing: .06em;
+    font-family: var(--fonte-display);
+    font-variation-settings: var(--display-cond);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .12em;
     text-transform: uppercase;
-    color: var(--faint);
-    margin: 4px 0 10px;
+    color: var(--txt-label);
+    margin: 22px 0 10px;
+    padding-top: 16px;
+    border-top: 1px solid var(--borda-fina);
+}
+
+.sol-edit-inner > .sol-edit-secao-titulo:first-of-type {
+    margin-top: 4px;
+}
+
+/* O botao de adicionar respira longe do ultimo bloco. */
+.sol-edit-inner > .btn-add {
+    margin-top: 12px;
 }
 
 .sol-edit-form .btn-add {
