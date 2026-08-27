@@ -36,8 +36,13 @@ create table if not exists public.solicitacao_itens (
   solicitacao_id bigint not null references public.solicitacoes(id) on delete cascade,
   funcao text not null,
   quantidade integer not null default 0,
-  colaboradores jsonb not null default '[]'::jsonb
+  colaboradores jsonb not null default '[]'::jsonb,
+  tipo text not null default 'funcao',
+  equipamento text
 );
+
+alter table public.solicitacao_itens add column if not exists tipo text not null default 'funcao';
+alter table public.solicitacao_itens add column if not exists equipamento text;
 
 -- ========== USUÁRIOS E AUDITORIA ==========
 create table if not exists public.usuarios (
