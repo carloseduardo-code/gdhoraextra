@@ -100,7 +100,8 @@ async function carregar(q, data) {
             toggle.addEventListener('click', e => { e.stopPropagation(); alternar(); });
             // A linha inteira abre a ficha: é o alvo que o RH mira.
             row.querySelector('.sol-row-head').addEventListener('click', alternar);
-            row.querySelector('.btn-copiar-texto')?.addEventListener('click', () => copiarTexto(row.dataset.texto || ''));
+            const btnCopiar = row.querySelector('.btn-copiar-texto');
+            btnCopiar?.addEventListener('click', () => copiarTexto(row.dataset.texto || '', btnCopiar));
             row.querySelector('.btn-apagar')?.addEventListener('click', () => apagarSolicitacao(id));
             row.querySelector('.btn-editar')?.addEventListener('click', () => alternarEdicao(row, id));
         });
@@ -120,7 +121,8 @@ function criarLinha(sol) {
     const setor = sol.setor_solicitante || sol.setor || '—';
     const equipamento = sol.equipamento || '';
     const asCode = sol.as_code || '';
-    const referencia = equipamento || (asCode.includes(' - ') ? asCode.split(' - ')[0] : asCode) || '—';
+    // A AS identifica a solicitação; o equipamento só entra quando não há AS.
+    const referencia = (asCode.includes(' - ') ? asCode.split(' - ')[0] : asCode) || equipamento || '—';
     const titulo = `HE ${formatarData(sol.data_solicitacao)} · ${referencia}`;
     const resumo = sol.resumo_texto || montarResumoAdmin(sol);
 
@@ -198,12 +200,31 @@ function formatarColaborador(c) {
     return `${c.matricula || ''} - ${c.nome || ''}`.trim();
 }
 
-async function copiarTexto(texto) {
+async function copiarTexto(texto, botao) {
+    let ok = true;
     try {
         await navigator.clipboard.writeText(texto);
     } catch {
-        /* silencioso: clipboard indisponível */
+        // Sem permissão de clipboard (http, navegador antigo): copia pela seleção.
+        const area = document.createElement('textarea');
+        area.value = texto;
+        area.setAttribute('readonly', '');
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+        try {
+            ok = document.execCommand('copy');
+        } catch {
+            ok = false;
+        }
+        area.remove();
     }
+    // Sem retorno na tela o RH não sabe se o texto foi para a área de transferência.
+    if (!botao) return;
+    const original = botao.textContent;
+    botao.textContent = ok ? 'Copiado' : 'Não foi possível copiar';
+    setTimeout(() => { botao.textContent = original; }, 1800);
 }
 
 async function apagarSolicitacao(id) {
@@ -223,7 +244,7 @@ async function apagarSolicitacao(id) {
 
 function montarResumoAdmin(sol) {
     const data = formatarData(sol.data_solicitacao);
-    const ref = sol.equipamento || sol.as_code || '';
+    const ref = sol.as_code || sol.equipamento || '';
     let t = `HE ${data} - ${ref}\n\n`;
     (sol.solicitacao_itens || []).forEach(item => {
         const qtd = String(item.quantidade || 0).padStart(2, '0');
@@ -349,11 +370,11 @@ function montarFormularioEdicao(sol) {
 
     wrap.appendChild(grid);
 
-    // Os itens vem todos na mesma tabela; o que separa um equipamento de uma
-    // funcao e o nome bater com a lista de equipamentos cadastrada.
+    // Os itens vem todos na mesma tabela; quem separa equipamento de funcao
+    // e o tipo gravado no item (ver ehItemEquipamento).
     const todos = (sol.solicitacao_itens || []).filter(i => i.funcao);
-    const itens = todos.filter(i => !ehEquipamento(i.funcao));
-    const itensEquip = todos.filter(i => ehEquipamento(i.funcao));
+    const itens = todos.filter(i => !ehItemEquipamento(i));
+    const itensEquip = todos.filter(i => ehItemEquipamento(i));
 
     const funcTitle = document.createElement('div');
     funcTitle.className = 'sol-edit-secao-titulo';
@@ -542,7 +563,13 @@ async function carregarColaboradoresEdicao(funcao, container, qtdInput, bloco, s
         (selecionados || []).forEach(c => {
             const key = `${c.matricula}|${c.nome}`;
             if (!presentes.has(key)) {
-                colaboradores.push({ matricula: c.matricula, nome: c.nome, funcao });
+                colaboradores.push({
+                    matricula: c.matricula,
+                    nome: c.nome,
+                    funcao,
+                    a_procura: !!c.a_procura,
+                    descricao: c.descricao || '',
+                });
                 presentes.add(key);
             }
         });
@@ -557,6 +584,10 @@ async function carregarColaboradoresEdicao(funcao, container, qtdInput, bloco, s
             checkbox.value = col.nome;
             checkbox.dataset.matricula = col.matricula;
             checkbox.dataset.nome = col.nome;
+            if (col.a_procura) {
+                checkbox.dataset.aProcura = '1';
+                checkbox.dataset.descricao = col.descricao || col.nome || '';
+            }
             if (jaSelecionados.has(`${col.matricula}|${col.nome}`)) checkbox.checked = true;
             checkbox.addEventListener('change', () => atualizarQuantidadeBloco(container, qtdInput, bloco));
             label.appendChild(checkbox);
@@ -569,7 +600,9 @@ async function carregarColaboradoresEdicao(funcao, container, qtdInput, bloco, s
 
             const nome = document.createElement('span');
             nome.className = 'colab-nome';
-            nome.textContent = col.nome || '';
+            nome.textContent = col.a_procura
+                ? `${col.descricao || col.nome || 'vaga'} (À procura...)`
+                : (col.nome || '');
             label.appendChild(nome);
 
             container.appendChild(label);
@@ -642,8 +675,15 @@ function adicionarBlocoEdicao(container, itemExistente) {
     return bloco;
 }
 
-/* Um item e equipamento quando o nome consta na lista de equipamentos
-   cadastrada — a tabela de itens nao guarda o tipo. */
+/* O item traz o tipo gravado. Fichas antigas, salvas antes da coluna existir,
+   caem na heuristica: e equipamento quando o nome consta na lista cadastrada. */
+function ehItemEquipamento(item) {
+    const tipo = String(item?.tipo || '').trim();
+    if (tipo) return tipo === 'equipamento';
+    if (item?.equipamento) return true;
+    return ehEquipamento(item?.funcao);
+}
+
 function ehEquipamento(nome) {
     const lista = (formConfigCache?.opcoes?.equipamento) || [];
     const alvo = String(nome || '').trim().toLowerCase();
@@ -682,7 +722,7 @@ function adicionarBlocoEquipamentoEdicao(container, itemExistente) {
     gEquip.className = 'form-group';
     gEquip.style.marginBottom = '0';
     gEquip.innerHTML = '<label>Equipamento</label>';
-    const selEquip = montarSelectOpcoes('equipamento', itemExistente?.funcao || '');
+    const selEquip = montarSelectOpcoes('equipamento', itemExistente?.equipamento || itemExistente?.funcao || '');
     selEquip.classList.add('equipamento-select-edicao');
     gEquip.appendChild(selEquip);
     grid.appendChild(gEquip);
@@ -751,7 +791,9 @@ function coletarDadosEdicao(formWrap) {
         const colaboradores = Array.from(checkboxes).map(cb => ({
             matricula: cb.dataset.matricula,
             nome: cb.dataset.nome || cb.value,
-            a_procura: false,
+            // Vaga em aberto continua em aberto depois da edição.
+            a_procura: cb.dataset.aProcura === '1',
+            descricao: cb.dataset.descricao || '',
         }));
         if (!colaboradores.length) return;
         const quantidade = parseInt(bloco.querySelector('.quantidade-input')?.value, 10) || colaboradores.length;
@@ -789,9 +831,9 @@ async function salvarEdicao(id, formWrap, btnSalvar, msgErro) {
         msgErro.textContent = 'Informe a data da solicitação.';
         return;
     }
-    if (!payload.itens.length) {
+    if (!payload.itens.length && !payload.equipamentos.length) {
         msgErro.hidden = false;
-        msgErro.textContent = 'Adicione ao menos uma função com colaboradores.';
+        msgErro.textContent = 'Adicione ao menos uma função com colaboradores ou um equipamento.';
         return;
     }
     btnSalvar.disabled = true;

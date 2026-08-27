@@ -1,6 +1,5 @@
 import os
 import json
-import re
 import time
 import unicodedata
 from datetime import datetime, timedelta, date
@@ -85,6 +84,14 @@ def usuario_master():
     return bool(user and str(user.get("usuario") or "").strip().lower() == "kadu")
 
 
+def destino_interno(destino, padrao):
+    """Só aceita caminho do próprio site como `next` do login: uma URL externa
+    ali transformaria a tela de login num redirecionador para fora."""
+    if destino and destino.startswith("/") and not destino.startswith("//"):
+        return destino
+    return padrao
+
+
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -122,23 +129,72 @@ def formatar_data_br(data_iso):
         return data_iso or ""
 
 
-def extrair_codigo_curto(valor):
-    """Extrai código curto tipo ED-2012KS-01 de um texto AS ou equipamento."""
-    if not valor:
-        return ""
-    m = re.search(r"([A-Z]{1,4}-\d[\w\-/]*)", valor.upper())
-    if m:
-        return m.group(1)
-    # AS_023-ED-2012KS-01 → tenta após hífen
-    if "-" in valor:
-        partes = valor.split("-", 1)
-        if len(partes) > 1 and partes[1].strip():
-            rest = partes[1].strip()
-            m2 = re.search(r"([A-Z]{1,4}-\d[\w\-/]*)", rest.upper())
-            if m2:
-                return m2.group(1)
-            return rest.split()[0] if rest.split() else rest
-    return valor
+def referencia_solicitacao(sol):
+    """Referência do cabeçalho do resumo. É a AS que identifica a solicitação
+    para o RH; o equipamento só entra quando não há AS registrada (caso das
+    fichas antigas, gravadas antes de a AS ser obrigatória)."""
+    as_code = (sol.get("as_code") or "").strip()
+    if as_code and as_code.upper() != "N/A":
+        return as_code
+    return (sol.get("equipamento") or "").strip()
+
+
+def tipo_do_item(item):
+    """Itens antigos foram gravados sem a coluna `tipo`: nesses casos o item só
+    é equipamento quando traz o nome do equipamento preenchido."""
+    tipo = (item.get("tipo") or "").strip()
+    if tipo:
+        return tipo
+    return "equipamento" if (item.get("equipamento") or "").strip() else "funcao"
+
+
+def titulo_resumo(sol):
+    return f"HE {formatar_data_br(sol.get('data_solicitacao'))} - {referencia_solicitacao(sol)}".strip(" -")
+
+
+def normalizar_titulo_resumo(texto, sol):
+    """Reescreve a primeira linha de um resumo já gravado com a referência
+    atual. Fichas antigas foram salvas com o equipamento no título; o texto
+    copiado passa a sair com a AS sem precisar reeditar cada solicitação."""
+    if not texto:
+        return texto
+    linhas = texto.split("\n")
+    if linhas and linhas[0].startswith("HE "):
+        linhas[0] = titulo_resumo(sol)
+        return "\n".join(linhas)
+    return texto
+
+
+# A tabela solicitacao_itens ganhou as colunas `tipo` e `equipamento`
+# (migration_itens_tipo.sql). Enquanto a migração não roda no banco, o insert
+# cai para o formato antigo — a flag evita repetir a tentativa a cada item.
+_ITENS_ACEITAM_TIPO = True
+
+
+def inserir_itens_solicitacao(solicitacao_id, itens):
+    """Grava os itens preservando o tipo (função x equipamento). Sem isso o
+    equipamento volta do banco como se fosse uma função: some da exportação e
+    entra na contagem de funções do painel."""
+    global _ITENS_ACEITAM_TIPO
+    for item in itens:
+        base = {
+            "solicitacao_id": solicitacao_id,
+            "funcao": item["funcao"],
+            "quantidade": item["quantidade"],
+            "colaboradores": item["colaboradores"],
+        }
+        if _ITENS_ACEITAM_TIPO:
+            completo = {
+                **base,
+                "tipo": item.get("tipo") or "funcao",
+                "equipamento": item.get("equipamento"),
+            }
+            try:
+                supabase.table("solicitacao_itens").insert(completo).execute()
+                continue
+            except Exception:
+                _ITENS_ACEITAM_TIPO = False
+        supabase.table("solicitacao_itens").insert(base).execute()
 
 
 def normalizar_colaborador(c):
@@ -169,13 +225,9 @@ def linha_colaborador(c):
 
 
 def gerar_resumo(sol, itens):
-    data_br = formatar_data_br(sol.get("data_solicitacao"))
-    ref = sol.get("equipamento") or extrair_codigo_curto(sol.get("as_code") or "")
-    titulo = f"HE {data_br} - {ref}".strip(" -")
-
-    linhas = [titulo, ""]
+    linhas = [titulo_resumo(sol), ""]
     for item in itens:
-        tipo = item.get("tipo") or "funcao"
+        tipo = tipo_do_item(item)
         cols = [normalizar_colaborador(c) for c in (item.get("colaboradores") or [])]
         qtd = item.get("quantidade") or len(cols) or 1
         qtd_fmt = f"{int(qtd):02d}" if int(qtd) < 100 else str(int(qtd))
@@ -207,12 +259,9 @@ def gerar_resumo(sol, itens):
 
 
 def gerar_resumo_admin(sol, itens):
-    data_br = formatar_data_br(sol.get("data_solicitacao"))
-    ref = sol.get("equipamento") or extrair_codigo_curto(sol.get("as_code") or "")
-    titulo = f"HE {data_br} - {ref}".strip(" -")
-    linhas = [titulo, ""]
+    linhas = [titulo_resumo(sol), ""]
     for item in itens:
-        if (item.get("tipo") or "funcao") == "equipamento":
+        if tipo_do_item(item) == "equipamento":
             eq = (item.get("equipamento") or item.get("funcao") or "").upper()
             qtd = int(item.get("quantidade") or len(item.get("colaboradores") or []) or 1)
             qtd_fmt = f"{qtd:02d}" if qtd < 100 else str(qtd)
@@ -447,8 +496,7 @@ def admin_login():
                 session["user_login"] = user["usuario"]
                 session["user_nome"] = user["nome"]
                 auditar("login", "usuario", user["id"])
-                nxt = request.args.get("next") or url_for("admin_home")
-                return redirect(nxt)
+                return redirect(destino_interno(request.args.get("next"), url_for("admin_home")))
             erro = "Usuário ou senha incorretos."
 
     return render_template(
@@ -533,10 +581,23 @@ def _pessoas_da_solicitacao(sol):
     pessoas = set()
     for item in sol.get("solicitacao_itens") or []:
         for c in item.get("colaboradores") or []:
+            # Vaga em aberto não é gente: contá-la aqui somaria horas de
+            # alguém que não existe — a tela de horas extras já a ignora.
+            if c.get("a_procura"):
+                continue
             chave = (c.get("matricula") or c.get("nome") or "").strip().lower()
             if chave:
                 pessoas.add(chave)
     return pessoas
+
+
+def _equipamentos_da_solicitacao(sol):
+    """Equipamentos vinculados ao pedido. Conta os itens do tipo equipamento;
+    fichas antigas, que só guardavam o equipamento no cabeçalho, valem 1."""
+    itens = [i for i in (sol.get("solicitacao_itens") or []) if tipo_do_item(i) == "equipamento"]
+    if itens:
+        return len(itens)
+    return 1 if (sol.get("equipamento") or "").strip() else 0
 
 
 def _janela_dashboard(periodo, dia):
@@ -644,8 +705,7 @@ def _calcular_metricas_dashboard_sem_cache(periodo="7", dia=""):
             do_pedido = _pessoas_da_solicitacao(sol)
             pessoas |= do_pedido
             horas += horas_do_turno(sol.get("turno") or "Dia") * len(do_pedido)
-            if (sol.get("equipamento") or "").strip():
-                equipamentos += 1
+            equipamentos += _equipamentos_da_solicitacao(sol)
         return len(pessoas), horas, equipamentos
 
     pessoas_qtd, horas_total, equip_qtd = agrega(no_periodo)
@@ -666,6 +726,8 @@ def _calcular_metricas_dashboard_sem_cache(periodo="7", dia=""):
 
         equip_nome = (sol.get("equipamento") or "").strip()
         for item in sol.get("solicitacao_itens") or []:
+            if tipo_do_item(item) == "equipamento":
+                continue
             funcao = (item.get("funcao") or "").strip()
             if not funcao or (equip_nome and funcao.upper() == equip_nome.upper()):
                 continue
@@ -1281,8 +1343,11 @@ def create_solicitacao():
         resumo_admin = gerar_resumo_admin(meta, itens_norm)
 
         sol_payload = {
-            "setor": setor_solicitante or as_code or "N/A",
-            "as_code": as_code or equipamento or "N/A",
+            "setor": setor_solicitante or "N/A",
+            # A AS nunca recebe o nome do equipamento: quem lê a ficha depois
+            # (título do resumo, coluna AS, exportação) passaria a ver o
+            # equipamento no lugar da área de serviço.
+            "as_code": as_code or "N/A",
             "data_solicitacao": data_solicitacao,
             "turno": turno or "Dia",
         }
@@ -1299,13 +1364,7 @@ def create_solicitacao():
 
         solicitacao_id = sol_res.data[0]["id"]
 
-        for item in itens_norm:
-            supabase.table("solicitacao_itens").insert({
-                "solicitacao_id": solicitacao_id,
-                "funcao": item["funcao"],
-                "quantidade": item["quantidade"],
-                "colaboradores": item["colaboradores"],
-            }).execute()
+        inserir_itens_solicitacao(solicitacao_id, itens_norm)
 
         # Registra auditoria
         auditar("criar", "solicitacao", solicitacao_id, {
@@ -1341,10 +1400,13 @@ def get_solicitacao(sol_id):
         if not sol.data:
             return jsonify({"error": "Não encontrada"}), 404
         row = sol.data[0]
+        itens = row.get("solicitacao_itens") or []
         if not row.get("resumo_texto"):
-            itens = row.get("solicitacao_itens") or []
             row["resumo_texto"] = gerar_resumo(row, itens)
             row["resumo_admin"] = gerar_resumo_admin(row, itens)
+        else:
+            row["resumo_texto"] = normalizar_titulo_resumo(row["resumo_texto"], row)
+            row["resumo_admin"] = normalizar_titulo_resumo(row.get("resumo_admin"), row)
         return jsonify(row)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1364,6 +1426,9 @@ def listar_solicitacoes_admin():
             .execute()
         )
         dados = sol_res.data or []
+        for s in dados:
+            s["resumo_texto"] = normalizar_titulo_resumo(s.get("resumo_texto"), s)
+            s["resumo_admin"] = normalizar_titulo_resumo(s.get("resumo_admin"), s)
         if data_filtro:
             dados = [s for s in dados if str(s.get("data_solicitacao") or "") == data_filtro]
         if q:
@@ -1520,8 +1585,11 @@ def editar_solicitacao_admin(sol_id):
         resumo_admin = gerar_resumo_admin(meta, itens_norm)
 
         sol_payload = {
-            "setor": setor_solicitante or as_code or "N/A",
-            "as_code": as_code or equipamento or "N/A",
+            "setor": setor_solicitante or "N/A",
+            # A AS nunca recebe o nome do equipamento: quem lê a ficha depois
+            # (título do resumo, coluna AS, exportação) passaria a ver o
+            # equipamento no lugar da área de serviço.
+            "as_code": as_code or "N/A",
             "data_solicitacao": data_solicitacao,
             "turno": turno or "Dia",
             "solicitante": solicitante or None,
@@ -1534,13 +1602,7 @@ def editar_solicitacao_admin(sol_id):
         supabase.table("solicitacoes").update(sol_payload).eq("id", sol_id).execute()
 
         supabase.table("solicitacao_itens").delete().eq("solicitacao_id", sol_id).execute()
-        for item in itens_norm:
-            supabase.table("solicitacao_itens").insert({
-                "solicitacao_id": sol_id,
-                "funcao": item["funcao"],
-                "quantidade": item["quantidade"],
-                "colaboradores": item["colaboradores"],
-            }).execute()
+        inserir_itens_solicitacao(sol_id, itens_norm)
 
         auditar("editar", "solicitacao", sol_id, {
             "antes": {
@@ -1590,7 +1652,7 @@ def exportar_excel():
             as_code = sol.get("as_code") or ""
 
             for item in sol.get("solicitacao_itens") or []:
-                tipo = item.get("tipo") or "funcao"
+                tipo = tipo_do_item(item)
                 equipamento_nome = item.get("equipamento") or (item.get("funcao") if tipo == "equipamento" else "") or ""
                 colaboradores = item.get("colaboradores") or []
 
